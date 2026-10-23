@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>5B Gipser – Rechnungen</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23154D72'/><text x='50' y='70' font-size='58' font-family='Arial' font-weight='900' fill='white' text-anchor='middle'>5B</text></svg>">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="5B Rechnungen">
+<meta name="application-name" content="5B Rechnungen">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -299,6 +308,7 @@ table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
         <span class="hint" id="listHint"></span>
         <button class="btn" data-act="import">PDF-Liste importieren</button>
         <button class="btn" data-act="exportAll" id="btnExportAll">Alle exportieren</button>
+        <button class="btn warn" data-act="deleteShown" id="btnDeleteShown">Alle löschen</button>
         <button class="btn primary" data-act="new">Neue Rechnung</button>
       </div>
       <div class="tablewrap" id="listWrap"></div>
@@ -498,7 +508,7 @@ function buildPdf(inv,S,logo){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, runTransaction, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 /* ================================================================
    HIER DEINE FIREBASE-KONFIGURATION EINFÜGEN
@@ -573,6 +583,7 @@ let invoices=[], users=[];
 let tab='neu', search='';
 let draft=null, dirty=false, importRows=[];
 let unsub=[];
+let shownList=[];
 let logoInfo=null;
 
 function setLogos(){
@@ -656,6 +667,7 @@ function renderList(){
     $('#listHint').textContent={neu:'Rechnungen bleiben hier, bis sie als PDF exportiert sind.',gesendet:`Exportierte Rechnungen. Nach ${+S.zahlungsfrist||30} Tagen ohne Zahlung kommen sie unter «Achtung Mahnung».`,mahnung:'Diese Rechnungen sind überfällig. Erinnerung senden oder als bezahlt markieren.',bezahlt:'Bezahlte Rechnungen.'}[tab]||'';
   }
   show('#btnExportAll',!search&&tab==='neu'&&list.length>1);
+  shownList=list; show('#btnDeleteShown',list.length>0); $('#btnDeleteShown').textContent=search?`${list.length} Treffer löschen`:`Alle ${list.length} löschen`;
   list.sort((a,b)=>String(b.nr||'').localeCompare(String(a.nr||''))||String(b.datum||'').localeCompare(String(a.datum||'')));
   if(!list.length){
     $('#listWrap').innerHTML=search?`<div class="empty"><strong>Nichts gefunden</strong>Andere Schreibweise oder die Auftrags-Nr. versuchen.</div>`
@@ -682,6 +694,19 @@ function renderList(){
         <td class="c-auf"><span class="mlabel">Auftrag </span>${i.auftragsnr?esc(i.auftragsnr):'<span class="badge miss">fehlt</span>'}</td>
         <td class="num c-amt"><strong>${fmt(totalOf(i))}</strong>${late?`<div><span class="badge late">${daysOpen(i)} Tage offen</span></div>`:''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
         <td class="acts c-acts">${acts}</td></tr>`;}).join('')}</tbody></table>`;
+}
+
+/* ---------- Mehrere Rechnungen löschen ---------- */
+async function deleteMany(list,label){
+  if(!list.length)return;
+  const word=prompt(`${list.length} Rechnungen (${label}) endgültig löschen?\n\nDas kann nicht rückgängig gemacht werden.\nZum Bestätigen LÖSCHEN eintippen:`);
+  if(word===null)return;
+  if(word.trim().toUpperCase()!=='LÖSCHEN'&&word.trim().toUpperCase()!=='LOESCHEN'){toast('Nicht gelöscht: Bestätigung falsch eingegeben.');return;}
+  let done=0;
+  for(let i=0;i<list.length;i+=400){
+    const b=writeBatch(db); list.slice(i,i+400).forEach(inv=>b.delete(doc(db,'invoices',inv.id))); await b.commit(); done+=Math.min(400,list.length-i);
+  }
+  toast(`${done} Rechnungen gelöscht`);
 }
 
 /* ---------- Rechnungsnummer YYYY.MM.DD.NN ---------- */
@@ -866,6 +891,10 @@ function renderSettings(){
         </tbody></table>
         ${isAdmin?'<button class="btn small" data-act="addCatItem" style="margin-top:.6rem">Position hinzufügen</button>':''}
       </div>
+      ${isAdmin?`<div class="card full"><h3>Daten</h3>
+        <p style="margin:0 0 .7rem;color:var(--muted)">Löscht alle ${invoices.length} Rechnungen aus allen Bereichen (Neu, Gesendet, Mahnung, Archiv). Einstellungen und Benutzer bleiben erhalten. Die Rechnungsnummern laufen danach weiter, damit keine Nummer doppelt vergeben wird.</p>
+        <button class="btn warn" data-act="deleteAll" ${invoices.length?'':'disabled'}>Alle Rechnungen löschen</button>
+      </div>`:''}
       <div class="card full"><h3>Konten (nur zur Info)</h3>
         <div class="grid">
           <div><div style="font-size:13px;color:var(--muted)">Firebase-Konto</div><div style="font-weight:600;word-break:break-all">Madech.ch@gmail.com</div></div>
@@ -923,6 +952,8 @@ document.addEventListener('click',async e=>{
         if(!confirm(`${list.length} Rechnungen als PDF exportieren und nach «Gesendet» verschieben? Der Browser fragt eventuell, ob mehrere Downloads erlaubt sind.`))break;
         for(const i of list){ const c=plain(i); c.id=i.id; await exportPdf(c); await new Promise(r=>setTimeout(r,450)); }
         break; }
+      case 'deleteShown': { const lbl={neu:'Neu',gesendet:'Gesendet',mahnung:'Achtung Mahnung',bezahlt:'Archiv'}; await deleteMany(shownList.slice(), search?`Suche «${search}»`:lbl[tab]); break; }
+      case 'deleteAll': await deleteMany(invoices.slice(),'alle Bereiche'); break;
       case 'delRow': if(confirm(`Rechnung ${inv.nr} (${inv.kunde||''}) endgültig löschen?`)){ await deleteDoc(doc(db,'invoices',id)); toast(`${inv.nr} gelöscht`); } break;
       case 'pdf': { const c=plain(inv); c.id=inv.id; await exportPdf(c); break; }
       case 'remind': { const c=plain(inv); c.id=inv.id; c.erinnerung=todayIso(); await updateDoc(doc(db,'invoices',id),{erinnerung:c.erinnerung}); buildPdf(c,S,logoInfo).save(pdfFileName(c,S).replace('.pdf',' - Erinnerung.pdf')); toast('Erinnerung erstellt'); break; }
