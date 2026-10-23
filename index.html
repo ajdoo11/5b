@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5B Gipser – Rechnungen</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23154D72'/><text x='50' y='70' font-size='58' font-family='Arial' font-weight='900' fill='white' text-anchor='middle'>5B</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --petrol:#154D72; --petrol-2:#0f3a57; --petrol-soft:#dfe9f1;
+  --gips:#eef1f3; --panel:#ffffff; --line:#d5dbe0; --text:#1d2830; --muted:#5f6d78;
+  --orange:#e8892b; --red:#c8382e; --green:#2e7d4f; --field:#ffffff;
+  --shadow:0 1px 0 rgba(21,77,114,.08);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --petrol:#5c9cc8; --petrol-2:#7fb3d8; --petrol-soft:#1c3446;
+    --gips:#12181d; --panel:#1a2229; --line:#2c3842; --text:#e4eaef; --muted:#93a2ad;
+    --orange:#f0a050; --red:#e8695f; --green:#5cbf86; --field:#141b21;
+    --shadow:none; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;background:var(--gips);color:var(--text);font:15px/1.45 "Barlow",system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+h1,h2,h3{font-family:"Barlow Condensed","Barlow",Arial Narrow,sans-serif;font-weight:600;letter-spacing:.01em;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.hidden{display:none!important}
+.btn{border:1px solid var(--line);background:var(--panel);padding:.5rem .9rem;border-radius:6px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--petrol)}
+.btn.primary{background:var(--petrol);border-color:var(--petrol);color:#fff}
+.btn.primary:hover{background:var(--petrol-2)}
+.btn.warn{color:var(--red)}
+.btn.ok{color:var(--green)}
+.btn.small{padding:.3rem .6rem;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{background:var(--field);border:1px solid var(--line);border-radius:5px;padding:.45rem .55rem;width:100%}
+textarea{resize:vertical;min-height:4.2rem}
+label{display:block;font-size:13px;color:var(--muted);font-weight:500}
+label > input,label > textarea,label > select{margin-top:.2rem;font-size:15px;color:var(--text)}
+
+/* Login */
+.center-screen{min-height:100vh;display:grid;place-items:center;padding:1.5rem}
+.auth-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:2rem;width:min(400px,100%)}
+.auth-card img{width:100%;max-width:280px;display:block;margin:0 auto 1.5rem;background:#fff;border-radius:4px}
+.auth-card form{display:grid;gap:.8rem}
+.auth-card .links{display:flex;justify-content:space-between;font-size:14px;margin-top:.8rem}
+.linkbtn{background:none;border:0;padding:0;color:var(--petrol);font-weight:600;text-decoration:underline}
+.msg{font-size:14px;color:var(--red);min-height:1.2em}
+
+/* App */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--panel);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--panel)}
+.top-inner{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.7rem 1.2rem}
+.top-inner .logo{height:34px;background:#fff;border-radius:3px;padding:2px 4px}
+.search{flex:1;max-width:460px;position:relative}
+.search input{padding-left:2.1rem}
+.search svg{position:absolute;left:.65rem;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
+.who{margin-left:auto;display:flex;align-items:center;gap:.6rem;font-size:13px;color:var(--muted)}
+main{max-width:1240px;margin:0 auto;padding:1.2rem}
+
+/* Ablauf-Leiste: Neu > Gesendet > Archiv */
+.flow{display:flex;gap:0;margin-bottom:1rem;overflow-x:auto}
+.flow button{flex:1;min-width:150px;border:0;background:var(--panel);padding:.75rem 1.6rem .75rem 2rem;text-align:left;position:relative;
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,0 100%,16px 50%);margin-right:-10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.flow button:first-child{clip-path:polygon(0 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,0 100%);padding-left:1.2rem;border-radius:6px 0 0 6px}
+.flow button:last-child{margin-right:0}
+.flow .n{display:block;font-family:"Barlow Condensed",sans-serif;font-size:30px;font-weight:700;line-height:1;color:var(--petrol)}
+.flow .t{font-size:14px;font-weight:600;color:var(--muted)}
+.flow .s{font-size:12px;color:var(--muted)}
+.flow button[aria-selected="true"]{background:var(--petrol);color:#fff}
+.flow button[aria-selected="true"] .n,.flow button[aria-selected="true"] .t,.flow button[aria-selected="true"] .s{color:#fff}
+.flow button.settings{flex:0 0 auto;min-width:0;clip-path:none;border:1px solid var(--line);border-radius:6px;margin-left:16px;padding:.75rem 1rem}
+
+.toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem}
+.toolbar .hint{color:var(--muted);font-size:14px;margin-right:auto}
+
+.tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow-x:auto;box-shadow:var(--shadow)}
+table.list{width:100%;border-collapse:collapse;min-width:820px}
+table.list th{font-size:12.5px;color:var(--muted);font-weight:600;text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--line);background:var(--petrol-soft)}
+table.list td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+table.list tr:last-child td{border-bottom:0}
+table.list tr.row{cursor:pointer}
+table.list tr.row:hover td{background:color-mix(in srgb,var(--petrol-soft) 45%,transparent)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td .sub{font-size:13px;color:var(--muted)}
+td.acts{white-space:nowrap;text-align:right}
+td.acts .btn{margin-left:.3rem}
+.nr{font-weight:600;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:.05rem .45rem;border-radius:4px;border:1px solid currentColor}
+.badge.neu{color:var(--orange)} .badge.gesendet{color:var(--petrol)} .badge.bezahlt{color:var(--green)} .badge.late{color:var(--red)} .badge.miss{color:var(--red)}
+.empty{padding:3rem 1rem;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:.3rem}
+
+/* Overlay (Editor, Import) */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(10,25,36,.45);display:flex;justify-content:flex-end}
+.sheet.wide{width:min(1280px,100%)}
+.sheet{background:var(--gips);width:min(980px,100%);height:100%;overflow:auto;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.sheet-head{position:sticky;top:0;z-index:2;background:var(--panel);border-bottom:1px solid var(--line);padding:.8rem 1.2rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.sheet-head h2{font-size:24px;margin-right:auto}
+.sheet-body{padding:1.2rem;display:grid;gap:1rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.1rem}
+.card h3{font-size:19px;margin-bottom:.7rem;color:var(--petrol)}
+.grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.grid .wide{grid-column:1/-1}
+.warnline{color:var(--red);font-size:13px;font-weight:600;margin-top:.25rem}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
+.chip{border:1px dashed var(--petrol);background:transparent;color:var(--petrol);border-radius:999px;padding:.3rem .75rem;font-size:13.5px;font-weight:600}
+.chip:hover{background:var(--petrol-soft)}
+table.pos{width:100%;border-collapse:collapse}
+table.pos th{font-size:12.5px;color:var(--muted);text-align:left;font-weight:600;padding:.3rem .3rem}
+table.pos td{padding:.3rem .3rem;vertical-align:middle}
+table.pos td.tot{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600;padding-right:.5rem}
+table.pos input{padding:.4rem .45rem}
+table.pos .x{border:0;background:none;color:var(--red);font-size:20px;line-height:1;padding:.2rem .4rem}
+.totals{margin-left:auto;width:min(340px,100%);margin-top:.8rem;font-variant-numeric:tabular-nums}
+.totals div{display:flex;justify-content:space-between;padding:.2rem 0}
+.totals .grand{border-top:2px solid var(--petrol);margin-top:.3rem;padding-top:.45rem;font-weight:700;font-size:18px;color:var(--petrol)}
+.posmobile{display:none}
+
+table.imp{width:100%;border-collapse:collapse;min-width:900px}
+table.imp th{font-size:12.5px;color:var(--muted);text-align:left;padding:.4rem;border-bottom:1px solid var(--line)}
+table.imp td{padding:.35rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
+table.imp tr.dup td{opacity:.55}
+table.imp input[type=checkbox]{width:18px;height:18px}
+table.imp .memo{font-size:12.5px;color:var(--muted);max-width:260px}
+table.imp .sug{font-size:12.5px;color:var(--petrol);font-weight:600}
+
+/* Einstellungen */
+.settings-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.settings-grid .full{grid-column:1/-1}
+table.cat{width:100%;border-collapse:collapse}
+table.cat td,table.cat th{padding:.3rem;text-align:left;font-size:14px}
+table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
+.userrow{display:flex;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.userrow:last-child{border-bottom:0}
+.userrow .em{font-weight:600;margin-right:auto;word-break:break-all}
+.logo-prev{background:#fff;border:1px solid var(--line);border-radius:4px;padding:.6rem;max-width:100%;margin:.4rem 0}
+.logo-prev img{max-width:100%;max-height:70px;display:block}
+.check{display:flex;gap:.5rem;align-items:center;color:var(--text);font-size:14px;margin-top:.4rem}
+.check input{width:18px;height:18px}
+
+.toast{position:fixed;left:50%;bottom:calc(1.2rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--text);color:var(--panel);padding:.65rem 1.1rem;border-radius:6px;z-index:90;font-weight:600;max-width:92vw}
+.setup{max-width:720px;margin:3rem auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.6rem}
+.setup code{background:var(--petrol-soft);padding:.1rem .3rem;border-radius:3px}
+
+@media (max-width:720px){
+  .top-inner{flex-wrap:wrap;gap:.6rem}
+  .search{order:3;flex-basis:100%;max-width:none}
+  .who span{display:none}
+  .flow button{min-width:120px;padding:.6rem 1.2rem .6rem 1.6rem}
+  .flow .n{font-size:24px}
+  table.pos thead{display:none}
+  table.pos tr{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:.3rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
+  table.pos td:first-child{grid-column:1/-1}
+  table.pos td.tot{grid-column:1/-2;text-align:left}
+}
+@media (prefers-reduced-motion: no-preference){
+  .sheet{animation:slidein .18s ease-out}
+  @keyframes slidein{from{transform:translateX(24px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head>
+<body>
+
+<!-- Einrichtungshinweis, falls Firebase-Konfiguration fehlt -->
+<div id="setup" class="setup hidden">
+  <h2>Firebase-Konfiguration fehlt</h2>
+  <p>Öffne diese Datei und trage im Abschnitt <code>firebaseConfig</code> die Werte aus der Firebase-Konsole ein (Projekteinstellungen → Allgemein → Deine Apps → Web-App).</p>
+  <p>Danach in der Firebase-Konsole unter Authentication die Anmeldemethode «E-Mail/Passwort» aktivieren und deine GitHub-Pages-Domain unter «Autorisierte Domains» eintragen.</p>
+</div>
+
+<!-- Anmeldung -->
+<section id="auth" class="center-screen hidden">
+  <div class="auth-card">
+    <img class="brandlogo" alt="5B Gipser GmbH">
+    <form id="authForm">
+      <h2 id="authTitle">Anmelden</h2>
+      <label>E-Mail<input type="email" id="authEmail" autocomplete="email" required></label>
+      <label>Passwort<input type="password" id="authPass" autocomplete="current-password" minlength="6" required></label>
+      <div class="msg" id="authMsg"></div>
+      <button class="btn primary" type="submit" id="authBtn">Anmelden</button>
+    </form>
+    <div class="links">
+      <button class="linkbtn" id="authToggle" type="button">Neues Konto registrieren</button>
+      <button class="linkbtn" id="authReset" type="button">Passwort vergessen</button>
+    </div>
+  </div>
+</section>
+
+<!-- Warten auf Freigabe -->
+<section id="pending" class="center-screen hidden">
+  <div class="auth-card">
+    <img class="brandlogo" alt="5B Gipser GmbH">
+    <h2>Konto wartet auf Freigabe</h2>
+    <p>Dein Konto <strong id="pendingMail"></strong> ist registriert. Sobald der Administrator es in den Einstellungen freigibt, öffnet sich die App automatisch.</p>
+    <button class="btn" data-act="logout">Abmelden</button>
+  </div>
+</section>
+
+<!-- App -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-inner">
+      <img class="logo brandlogo" alt="5B Gipser GmbH">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="search" placeholder="Suchen: Kunde, Auftrags-Nr., Adresse, Rechnungs-Nr." aria-label="Rechnungen durchsuchen">
+      </div>
+      <div class="who"><span id="whoMail"></span><button class="btn small" data-act="logout">Abmelden</button></div>
+    </div>
+  </header>
+  <main>
+    <nav class="flow" role="tablist" aria-label="Rechnungsstatus">
+      <button role="tab" data-tab="neu"><span class="n" id="cNeu">0</span><span class="t">Neu</span><br><span class="s" id="sNeu">noch nicht exportiert</span></button>
+      <button role="tab" data-tab="gesendet"><span class="n" id="cGes">0</span><span class="t">Gesendet</span><br><span class="s" id="sGes">offen</span></button>
+      <button role="tab" data-tab="bezahlt"><span class="n" id="cArc">0</span><span class="t">Archiv</span><br><span class="s" id="sArc">bezahlt</span></button>
+      <button role="tab" data-tab="settings" class="settings" aria-label="Einstellungen"><span class="t">Einstellungen</span></button>
+    </nav>
+    <div id="listView">
+      <div class="toolbar">
+        <span class="hint" id="listHint"></span>
+        <button class="btn" data-act="import">PDF-Liste importieren</button>
+        <button class="btn" data-act="exportAll" id="btnExportAll">Alle exportieren</button>
+        <button class="btn primary" data-act="new">Neue Rechnung</button>
+      </div>
+      <div class="tablewrap" id="listWrap"></div>
+    </div>
+    <div id="settingsView" class="hidden"></div>
+  </main>
+</div>
+
+<div id="overlay" class="overlay hidden"></div>
+<input type="file" id="pdfInput" accept="application/pdf" class="hidden">
+<input type="file" id="logoInput" accept="image/png,image/jpeg" class="hidden">
+
+<!-- ===================== Kernfunktionen (ohne Firebase) ===================== -->
+<script id="core">
+const DEFAULT_LOGO = "data:image/jpeg;base64,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u/8Ars//AKEarV0rY5XuFFFFMAooooAKKKKACiiigAooooAKKKKACiiigCzYaheaXeJd2NzJb3CH5ZIzg/T3HtXunw/+I8XiQLpup7IdVUfKw4W4A7j0b1H4j0HgVPhmltp454JGjljYOjqcFSOQRWVSkpo1pVpU35H13S1zfgfxKPFPhmC9bAuYz5Nwo7SADn6EEH2zjtXSV5kk07M9WMlJXQUUUUigooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA8k+OP8Ax66L/vzfySvG69k+OP8Ax66L/vzfySvG69LD/wANHlYn+IwooorcwCiiigAoor3zQvhp4UvfD+m3U+ms001rFJI32iQZYqCTw3rWdSqqe5pTpSqOyPA6K+jP+FVeDv8AoFv/AOBMv/xVH/CqvB3/AEC3/wDAmX/4qsvrUDb6pPufOdFfRn/CqvB3/QLf/wACZf8A4qj/AIVV4O/6Bb/+BMv/AMVR9agH1Sfc+c6K+jP+FVeDv+gW/wD4Ey//ABVH/CqvB3/QLf8A8CZf/iqPrUA+qT7nznRX0Z/wqrwd/wBAt/8AwJl/+Ko/4VV4O/6Bb/8AgTL/APFUfWoB9Un3PnOivoef4Z+CLWB57ixEUKDLSSXciqo9yW4rO/4RP4X/APPxp/8A4ND/APF0fWYvoJ4WS3aPCaK92/4RP4X/APPxp/8A4ND/APF0f8In8L/+fjT/APwaH/4un9Zj2Yvq0u6PCa+kfhl/yTrSv92T/wBGPWJ/wifwv/5+NP8A/Bof/i66bS9U8KaLpkWn2Gr6bFbQ5CIb1WxkknktnqTWNeqqiskb0KTpyu2fNmof8hK6/wCuz/zNVqsXzBtQuWUgqZWII78mq9dq2OB7hRV6w0XVNVV20/T7q6WMgOYImfaT64FXP+EQ8S/9AHUv/AV/8KTlFaNjUJPZGLRW1/wh/iX/AKAGpf8AgK/+FH/CH+Jf+gBqX/gK/wDhRzx7j5JdjFora/4Q/wAS/wDQA1L/AMBX/wAKP+EP8S/9ADUv/AV/8KOePcOSXYxaK2v+EP8AEv8A0ANS/wDAV/8ACopfDOvwIzy6JqSKoyWa0cAfjijni+ockuxlUUd6KokKKKKACiiigAooooA9I+DOrG08T3GmswEd7DkA9S6cj/x0vXu9fL/ge6+x+ONGlBxm6SP8GO3/ANmr6grz8UrTuelhJXhYKKKK5jqCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigDyT44/8AHrov+/N/JK8br2T44/8AHrov+/N/JK8br0sP/DR5WJ/iMKKKK3MAooooAK+qfDH/ACKej/8AXlD/AOgCvlavqnwx/wAino//AF5Q/wDoArjxeyOzB7s1qKKK4j0AopCwAySKge/tI/v3UC/WQCizFdFiiqTavpqfe1C1X6zKP60g1jTCcDUbQn0Ey/407MOZF6iqyX9nJ9y6gb6SA1YDAjIINKzC6Oa+IP8AyIWsf9cP6ivmavqrxFpJ13w/e6YswhNzHsEhXdt5z0yK8Xvvg54ltkZ7d7K7x0SOUqx/76AH612YacYpps4sVTlJpxR57RWpqnhvWtEZhqOmXNuqnaZGQmMn2cfKfwNZddiaexxNNbhRRRTEFFFFAHtHwP8A+QdrH/XaP+Rr1evKPgf/AMg7V/8ArtH/ACNer15df+Iz1cP/AA0FFFFZG4UUUUAFGKKKAMPxD4U0jxLavFf2kbSldqXCqBJH6Ybr+HT2r5o1bTptI1e706fBltpWjYjocHqPY9a+sq+cPigip8RNV2458psD1MS114WTu4nFi4LlUjkKKKK7jgCiiigAooooA0vD3HibSiOD9sh/9DFfVtfKvhiMzeLNHjH8V7CP/HxX1VXDi/iR34PZhRRRXIdoUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAeSfHH/j10X/AH5v5JXjdeyfHH/j10X/AH5v5JXjdelh/wCGjysT/EYUUUVuYBRRRQAV9T+G3WPwhpMjsFRbGEszHAA2Dmvliul1zxvqms6VaaSHNvp1tBHD5KN/rSqgbnPfkZx0HHcZrCtTdSyRvQqqnds9M8T/ABgsNOaS10OJb+4XgzuSIVPtjl/wwPQmvM9S+IHinVHzLrFxCuSQls3kge3y4J/EmuaoqoUIR6Ezrzn1HyzSzuXlleRzyWdiSfzplFFaWMrsKKKKYBSq7IcozL9DikoosFzXtvFXiC02CDW9RRU+6n2lyo/AnFdDY/FrxZZtmW5t7xeyzwAf+gbTXD0VDpxe6LVSa2Z7ZpHxp025ZYtX0+W0zgGWJvNT3JGAQPYZrTvPBXgzxtZte6U0EUjD/X2JAwcZ+dOnuQQD714BVzTNVvtGvVvNOupLadeN8Z6j0I6EcdDxWLw6WsHY2WIvpUV0bnivwFrHhRzJOn2mxJ+W6iB2jnow/hPT254Jrl6988EfEO08VwnSdXjii1BlK7CP3dyuOcA98dVPXt3A4n4j/DwaATq+lKx012xLF18gnp/wEnj2PHenTqtS5J7iqUU489PY85oooroOc9o+B/8AyDtX/wCu0f8AI16vXjfwd1fTdMsNVW/1C1tWeVConmVN3B6ZPNemf8JX4d/6D2mf+Bcf+NeZXT9oz1MPJKmtTYorH/4Svw7/ANB7TP8AwLj/AMaP+Er8O/8AQe0z/wAC4/8AGsuVm3NHubFFY/8Awlfh3/oPaZ/4Fx/40f8ACV+Hf+g9pn/gXH/jRysOaPc2KKx/+Er8Of8AQe0v/wADI/8AGq13468LWab5ddsmH/TGUSn8lzQovsHPFdToa+ZPH96moeO9XnjIZRN5YI77FCf+y133iv4w27Wstn4djlaVwV+2SLtCg90XqT7nGPQ146SSSSck9Sa7cNSlH3mcOKqxlaMQooorrOMKKKKACiiigDrfhnYtfePtOwuUgLTufQKpwf8AvrbX0lXlHwY8Ptb2V1r06Ya4/c25I52A/MfoWAH/AAGvV683ES5p+h6eGhyw16hRRRWB0hRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFNkJEbEdQCaAHUV81f8LI8X/8AQal/79p/8TR/wsjxf/0Gpf8Av2n/AMTXT9Vn3OT65DsfStFebfCbxHq/iCPVjqt61yYWi8vcqjbnfnoB6CvSKwnBwlys6ITU48yFoooqSwooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA8k+OP/Hrov+/N/JK8br2T44/8eui/7838krxuvSw/8NHlYn+IwooorcwCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAdHI8MiSRuyOhDKynBUjoQa+h/AXieLxn4alt79Uku4V8m7RhxIpBAbHT5hnI9Qfavnauo+H2utoHjGzmLYt7hvs044+6xAzz0w20/hWNenzR80bUKnJLXZlfxp4bfwt4knsOTbt+9t3P8AFGen4jkH6Vz9e7/GLRVvvC8WqIB51hIMnPWNyFI/762n868Ip0Z88Lirw5J2CiiitTIKKKKACiiigAooooAKKKKACiiigAorS0rw9q+uNjTNOuLkbtpdE+RT6FjwPxNdbp3wf8TXZBuxa2KZwfNlDtj1ATI/UVEqkY7suNOUtkcBXZ+B/h/e+KbqO5uEeDSVOXmIwZcfwp6+meg578V6VoHwi0LSnSa/Z9TnU5/ertiznj5BnP0JI9q79EWNFRFCoowqgYAHpXLUxKtaB1UsK73mMtraGztYra3jWOGJAiIvRVAwBU1FFcZ3hRRRQAUUUUAFFFJkUALRTPNj5BkUfjR50f8Az0T/AL6FFhXQ+imedH/z0T/voU/I9aB3CijI9aMj1oAKKMj1oyPWgAooyPWjI9aACijI9aM0AFNl/wBU/wDumnUhAIIPSgD5Bor6e/4Q/wAJ/wDQF03/AL8rR/wh/hP/AKAum/8Afla7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";
+
+const DEFAULT_KATALOG = [
+  {key:'bepl18',    bez:'Beplankung 18mm',            einheit:'m²', preis:24},
+  {key:'bepl125',   bez:'Beplankung 12.5mm',          einheit:'m²', preis:24},
+  {key:'aqua18',    bez:'Aquapanel 18mm',             einheit:'m²', preis:30},
+  {key:'aqua125',   bez:'Aquapanel 12.5mm',           einheit:'m²', preis:30},
+  {key:'diamant125',bez:'Diamant 12.5mm',             einheit:'m²', preis:32},
+  {key:'regie',     bez:'Regie',                      einheit:'h',  preis:60},
+  {key:'stell',     bez:'Stellstreifen (nach Aufwand)',einheit:'h', preis:60},
+  {key:'silent',    bez:'Silentpanels (nach Aufwand)', einheit:'h', preis:60}
+];
+
+const DEFAULT_SETTINGS = {
+  name:'5B Gipser GmbH', strasse:'Tischmacherhof 13', plzOrt:'8854 Galgenen', ort:'Galgenen',
+  ansprechpartner:'Gafur Ramadani', telefon:'076 418 16 83', email:'info@5b-gipser.ch',
+  bank:'Schwyzer Kantonalbank', iban:'CH21 0077 7008 8884 4457 9', mwstNr:'CHE-497.719.083',
+  empfaenger:'PE Fabrikations AG\nFeldmoosstrasse 51\n8853 Lachen',
+  anrede:'Sehr geehrte Damen und Herren',
+  einleitung:'Vielen Dank für Ihren Auftrag.\nWir stellen Ihnen folgende Leistungen in Rechnung:',
+  zahlungstext:'Zahlung innerhalb von 30 Tagen ab Rechnungseingang', zahlungsfrist:30,
+  mwstSatz:8.1, rundung:'auf05', nullAusblenden:true,
+  katalog: DEFAULT_KATALOG, logo:''
+};
+
+function cleanTxt(s){
+  return String(s||'')
+    .replace(/&\s*\u00FE[\u0000-\u001F]*/g,'')
+    .replace(/[\u0000-\u001F\u007F-\u009F\u00FE]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+
+/* Liest die Monteur-Abrechnung (PDF) und gibt nur die Daten zurück.
+   Die PDF selbst wird nirgends gespeichert. */
+async function parseListPdf(pdf){
+  const COLS=['nr','datum','kunde','auftragsnr','adresse','memo','status'];
+  const HEAD={'#':'nr','DATUM':'datum','KUNDE':'kunde','AUFTRAGSNR.':'auftragsnr','AUFTRAGSNR':'auftragsnr','ADRESSE':'adresse','MEMO':'memo','STATUS':'status'};
+  const rows=[]; let colX=null, cur=null, allText='';
+  for(let p=1;p<=pdf.numPages;p++){
+    const pg=await pdf.getPage(p); const tc=await pg.getTextContent();
+    const items=tc.items.map(i=>({x:i.transform[4],y:i.transform[5],s:cleanTxt(i.str)})).filter(i=>i.s);
+    allText+=' '+items.map(i=>i.s).join(' ');
+    items.sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[];
+    for(const it of items){let l=lines.find(l=>Math.abs(l.y-it.y)<3); if(!l){l={y:it.y,items:[]};lines.push(l);} l.items.push(it);}
+    lines.sort((a,b)=>b.y-a.y);
+    for(const l of lines){
+      l.items.sort((a,b)=>a.x-b.x);
+      const heads=l.items.filter(i=>HEAD[i.s.toUpperCase()]);
+      if(heads.length>=4){colX=heads.map(h=>({k:HEAD[h.s.toUpperCase()],x:h.x})).sort((a,b)=>a.x-b.x);continue;}
+      if(!colX)continue;
+      const joined=l.items.map(i=>i.s).join(' ');
+      if(/PE-MONTAGE|Seite \d+\/\d+|ABRECHNUNG/i.test(joined))continue;
+      const cells={};
+      for(const it of l.items){let k=colX[0].k; for(const c of colX){if(it.x>=c.x-3)k=c.k;} cells[k]=(cells[k]?cells[k]+' ':'')+it.s;}
+      if(cells.nr&&/^\d{1,4}$/.test(cells.nr)&&cells.datum&&/\d{2}\.\d{2}\.\d{4}/.test(cells.datum)){
+        cur={}; COLS.forEach(k=>cur[k]=cells[k]||''); rows.push(cur);
+      } else if(cur){ for(const k in cells){ if(k!=='nr'&&k!=='status') cur[k]=(cur[k]?cur[k]+' ':'')+cells[k]; } }
+    }
+  }
+  rows.forEach(r=>{for(const k in r)r[k]=cleanTxt(r[k]); r.status=r.status.replace(/^'+/,'').trim(); if(/^[—–-]+$/.test(r.auftragsnr))r.auftragsnr='';});
+  if(rows.length) return rows;
+  // Ersatzweg, falls keine Spaltenköpfe gefunden werden
+  const parts=allText.split(/\s(?=\d{1,3}\s+\d{2}\.\d{2}\.\d{4}\s)/);
+  for(const part of parts){
+    const m=part.trim().match(/^(\d{1,3})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+(\d{6,12}|—|–|-)\s+(.*)$/); if(!m)continue;
+    const rest=m[5].replace(/'?\s*FERTIG.*$/i,'').trim(); let adr='',memo=rest;
+    const c=rest.match(/^(.*?,\s*[A-Za-zÄÖÜäöüéè.\-]+)\s+(.*)$/); if(c){adr=c[1];memo=c[2];}
+    rows.push({nr:m[1],datum:m[2],kunde:m[3],auftragsnr:/^\d/.test(m[4])?m[4]:'',adresse:adr,memo,status:'FERTIG'});
+  }
+  return rows;
+}
+
+/* Vorschlag für Positionen aus dem Memo-Text */
+function suggestPositions(memo){
+  const M=(memo||'').toUpperCase(); const out=[];
+  const m2=M.match(/(\d+(?:[.,]\d+)?)\s*M2/); let qty=0;
+  if(m2){let v=m2[1]; if(/^\d{1,3}\.000$/.test(v))v=v.split('.')[0]; qty=parseFloat(v.replace(',','.'))||0;}
+  const aqua=/AQUA\s*PA?NE?E?L/.test(M), stell=/STELLSTREIFEN/.test(M);
+  if(/12[.,]5\s*MM/.test(M)&&!/18\s*MM/.test(M)) out.push({key:aqua?'aqua125':'bepl125',menge:qty});
+  else if(!stell&&(/18\s*MM/.test(M)||/BEPLAN/.test(M))) out.push({key:aqua?'aqua18':'bepl18',menge:qty});
+  if(/DIAMANT/.test(M)) out.push({key:'diamant125',menge:0});
+  if(/SILEN\w*\s*PANE?L|SILENTPAN/.test(M)) out.push({key:'silent',menge:0});
+  if(stell) out.push({key:'stell',menge:0});
+  if(/REGIE|WASSERSCHADEN/.test(M)) out.push({key:'regie',menge:0});
+  return out;
+}
+
+function chToIso(d){const m=String(d||'').match(/(\d{2})\.(\d{2})\.(\d{4})/); return m?`${m[3]}-${m[2]}-${m[1]}`:'';}
+function isoToCh(d){const m=String(d||'').match(/(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}.${m[2]}.${m[1]}`:'';}
+function todayIso(){const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function isoWeek(iso){
+  if(!iso)return ''; const [y,m,d]=iso.split('-').map(Number); const dt=new Date(Date.UTC(y,m-1,d));
+  const day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(dt.getUTCFullYear(),0,1)); return Math.ceil(((dt-y0)/86400000+1)/7);
+}
+function round2(n){return Math.round((+n||0)*100+1e-9)/100;}
+function round05(n){return Math.round((+n||0)*20+1e-9)/20;}
+function ceil05(n){return Math.ceil((+n||0)*20-1e-7)/20;}
+function roundBy(n,S){const m=S.rundung||(S.runden5===false?'none':'auf05'); return m==='auf05'?ceil05(n):m==='05'?round05(n):round2(n);}
+const kw2=k=>k?String(k).padStart(2,'0'):'';
+function fmt(n,sep='’'){const v=round2(n).toFixed(2); const [a,b]=v.split('.'); return a.replace(/\B(?=(\d{3})+(?!\d))/g,sep)+'.'+b;}
+function fmtQty(n){const v=+n||0; return Number.isInteger(v)?String(v):String(round2(v));}
+function calcTotals(inv,S){
+  const pos=(inv.positionen||[]);
+  const sub=round2(pos.reduce((s,p)=>s+round2((+p.menge||0)*(+p.preis||0)),0));
+  const rate=inv.mwstSatz!=null&&inv.mwstSatz!==''?+inv.mwstSatz:+S.mwstSatz;
+  const mwst=roundBy(sub*rate/100,S);
+  const total=roundBy(sub+mwst,S);
+  return {sub,mwst,total,rate};
+}
+function pdfFileName(inv,S){
+  const T=calcTotals(inv,S);
+  const safe=s=>String(s||'').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
+  return `${safe((inv.nr||'Entwurf').replace(/\./g,'_'))} - KW${kw2(inv.kw)} - ${safe(inv.kunde)} - ${fmt(T.total,"'")} CHF.pdf`;
+}
+
+/* Erzeugt die Rechnung als PDF (jsPDF). Gespeichert werden nur die Daten. */
+function buildPdf(inv,S,logo){
+  const {jsPDF}=window.jspdf; const d=new jsPDF({unit:'mm',format:'a4'});
+  const BLUE=[21,77,114],BAND=[218,227,243],SKY=[84,141,212],ORANGE=[230,126,34],RED=[220,30,30],LINK=[5,99,193];
+  const L=15,R=195,V=46; const T=calcTotals(inv,S); const F=n=>fmt(n,"'");
+  const font=(st,sz,col=[0,0,0])=>{d.setFont('helvetica',st);d.setFontSize(sz);d.setTextColor(...col);};
+  if(logo&&logo.data){let w=135,h=w*logo.h/logo.w; if(h>24){h=24;w=h*logo.w/logo.h;} try{d.addImage(logo.data,logo.fmt,105-w/2,11,w,h);}catch(e){}}
+
+  // Kopf links
+  let y=55; font('normal',9.5);
+  d.text('Rechnungs-Nr.',L,y); d.text(String(inv.nr||'—'),V,y);
+  d.text('Ansprechpartner',L,y+5); d.text(String(S.ansprechpartner||''),V,y+5);
+  d.text(String(S.telefon||''),V,y+10);
+  font('normal',9.5,LINK); d.text(String(S.email||''),V,y+15);
+  // Kopf rechts: Absenderzeile + Empfänger
+  font('normal',7.5); const sender=`${S.name} | ${S.strasse} | ${S.plzOrt}`; d.text(sender,110,y); d.setLineWidth(.15); d.line(110,y+.7,110+d.getTextWidth(sender),y+.7);
+  font('normal',10.5); String(inv.empfaenger||S.empfaenger||'').split('\n').slice(0,6).forEach((l,i)=>d.text(l,110,y+5.5+i*5));
+
+  // KW / Erinnerung
+  y=84; font('bold',12,ORANGE); d.text(`KW ${kw2(inv.kw)}`,V,y);
+  if(inv.erinnerung){font('normal',12,RED); d.text(`Erinnerung ${isoToCh(inv.erinnerung)}`,V+22,y);}
+
+  // Baustelle / Objekt
+  y=94; font('normal',16,SKY);
+  const tl=d.splitTextToSize(`Baustelle ${inv.objekt||''}`.trim(),R-V); d.text(tl,V,y); y+=(tl.length-1)*6.5+9;
+  font('bold',11); d.text(d.splitTextToSize(String(inv.kunde||''),88),V,y);
+  font('normal',10.5); d.text(`${S.ort}, den`,141,y); d.text(isoToCh(inv.datum),R,y,{align:'right'});
+  y+=5.2; font('normal',10.5); d.text(`Auftrags-Nr. ${inv.auftragsnr||'—'}`,V,y);
+  if(inv.bemerkung){y+=5.2; const bl=d.splitTextToSize(String(inv.bemerkung),R-V); d.text(bl,V,y); y+=(bl.length-1)*5;}
+  y+=7; d.text(String(S.anrede||''),L,y);
+  y+=7.5; String(S.einleitung||'').split('\n').forEach(l=>{d.text(l,L,y);y+=5;});
+
+  // Tabelle
+  const head=()=>{y+=3; d.setFillColor(...BAND); d.rect(L,y-4.6,R-L,6.6,'F'); font('bold',9.5);
+    d.text('Bezeichnung',L+1,y); d.text('Menge',132,y,{align:'right'}); d.text('Einzelpreis',163,y,{align:'right'}); d.text('Gesamtpreis',R-1,y,{align:'right'}); y+=8;};
+  head(); font('normal',10);
+  const pos=(inv.positionen||[]).filter(p=>!(S.nullAusblenden&&!(+p.menge)));
+  for(const p of pos){
+    const lines=d.splitTextToSize(String(p.bez||'').replace(/²/g,'2'),92);
+    if(y+lines.length*4.6>262){d.addPage(); y=20; head(); font('normal',10);}
+    d.text(lines,L+1,y);
+    d.text(`${fmtQty(p.menge)} ${String(p.einheit||'').replace(/²/g,'2').replace(/³/g,'3')}`.trim(),132,y,{align:'right'});
+    d.text(`${F(p.preis)} CHF`,163,y,{align:'right'});
+    d.text(`${F(round2((+p.menge||0)*(+p.preis||0)))} CHF`,R-1,y,{align:'right'});
+    y+=Math.max(1,lines.length)*4.6+1.4;
+  }
+  if(!pos.length){font('italic',10,[120,120,120]); d.text('Keine Positionen',L+1,y); y+=6;}
+
+  // Summen
+  if(y>232){d.addPage(); y=25;}
+  y=Math.max(y+10,y); font('normal',10.5);
+  d.text('Zwischensumme',V,y); d.text(`${F(T.sub)} CHF`,R-1,y,{align:'right'});
+  y+=7; d.text('zzgl. Mehrwertsteuer',V,y); d.text(`${fmtQty(T.rate)} %`,132,y,{align:'right'}); d.text(`${F(T.mwst)} CHF`,R-1,y,{align:'right'});
+  y+=5; d.setFillColor(...BAND); d.rect(L,y,R-L,7.5,'F'); font('bold',11);
+  d.text('Rechnungsbetrag',L+1,y+5.2); d.text(`${F(T.total)} CHF`,R-1,y+5.2,{align:'right'});
+
+  // Zahlung / Bank
+  y+=19; font('normal',10.5); d.text(d.splitTextToSize(`Zahlungsbedingungen: ${S.zahlungstext||''}`,R-L),L,y);
+  y+=13; font('normal',8.5);
+  [S.bank,`IBAN ${S.iban}`,`MWST-Nr. ${S.mwstNr}`].forEach((l,i)=>d.text(String(l||''),105,y+i*4.8,{align:'center'}));
+  return d;
+}
+</script>
+
+<!-- ===================== App mit Firebase ===================== -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+/* ================================================================
+   HIER DEINE FIREBASE-KONFIGURATION EINFÜGEN
+   (Firebase-Konsole → Projekteinstellungen → Allgemein → Web-App)
+   ================================================================ */
+const firebaseConfig = {
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:0000000000000000"
+};
+
+/* Diese E-Mails sind automatisch Administrator und sofort freigeschaltet.
+   Muss mit der Liste in den Firestore-Regeln übereinstimmen. */
+const ADMIN_EMAILS = ['info@5b-gipser.ch','admin@5b.ch'];
+
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const show=(id,on=true)=>$(id).classList.toggle('hidden',!on);
+let toastT; function toast(m){let t=$('.toast'); if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t);} t.textContent=m; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',3200);}
+
+if(!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('DEIN')){ show('#setup'); throw new Error('Firebase-Konfiguration fehlt'); }
+
+const fb=initializeApp(firebaseConfig);
+const auth=getAuth(fb);
+let db; try{ db=initializeFirestore(fb,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})}); }catch(e){ db=initializeFirestore(fb,{}); }
+
+/* ---------- Zustand ---------- */
+let user=null, profile=null, isAdmin=false;
+let S={...DEFAULT_SETTINGS};
+let invoices=[], users=[];
+let tab='neu', search='';
+let draft=null, dirty=false, importRows=[];
+let unsub=[];
+let logoInfo=null;
+
+function setLogos(){
+  const src=S.logo||DEFAULT_LOGO;
+  document.querySelectorAll('.brandlogo').forEach(i=>i.src=src);
+  const img=new Image(); img.onload=()=>{logoInfo={data:src,w:img.naturalWidth,h:img.naturalHeight,fmt:/^data:image\/png/.test(src)?'PNG':'JPEG'};}; img.src=src;
+}
+setLogos();
+
+/* ---------- Anmeldung ---------- */
+let regMode=false;
+$('#authToggle').onclick=()=>{regMode=!regMode; $('#authTitle').textContent=regMode?'Registrieren':'Anmelden'; $('#authBtn').textContent=regMode?'Konto erstellen':'Anmelden'; $('#authToggle').textContent=regMode?'Ich habe bereits ein Konto':'Neues Konto registrieren'; $('#authPass').autocomplete=regMode?'new-password':'current-password'; $('#authMsg').textContent='';};
+$('#authReset').onclick=async()=>{const e=$('#authEmail').value.trim(); if(!e){$('#authMsg').textContent='Bitte zuerst die E-Mail eingeben.';return;} try{await sendPasswordResetEmail(auth,e); $('#authMsg').textContent='Link zum Zurücksetzen wurde gesendet.';}catch(err){$('#authMsg').textContent=authErr(err);}};
+$('#authForm').onsubmit=async ev=>{ev.preventDefault(); const e=$('#authEmail').value.trim(), p=$('#authPass').value; $('#authMsg').textContent=''; $('#authBtn').disabled=true;
+  try{ if(regMode) await createUserWithEmailAndPassword(auth,e,p); else await signInWithEmailAndPassword(auth,e,p);}catch(err){$('#authMsg').textContent=authErr(err);} $('#authBtn').disabled=false;};
+function authErr(e){const c=e.code||''; return ({'auth/invalid-credential':'E-Mail oder Passwort ist falsch.','auth/wrong-password':'E-Mail oder Passwort ist falsch.','auth/user-not-found':'Kein Konto mit dieser E-Mail.','auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte anmelden.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.','auth/invalid-email':'Die E-Mail-Adresse ist ungültig.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut versuchen.','auth/operation-not-allowed':'E-Mail/Passwort-Anmeldung ist in Firebase nicht aktiviert.','auth/unauthorized-domain':'Diese Domain ist in Firebase nicht autorisiert.'})[c]||e.message;}
+
+onAuthStateChanged(auth, async u=>{
+  unsub.forEach(f=>f()); unsub=[]; user=u;
+  if(!u){ show('#app',false); show('#pending',false); show('#auth'); return; }
+  const email=(u.email||'').toLowerCase(); const adminMail=ADMIN_EMAILS.includes(email);
+  const ref=doc(db,'users',u.uid);
+  try{
+    let snap=await getDoc(ref);
+    if(!snap.exists()){ await setDoc(ref,{email,approved:adminMail,role:adminMail?'admin':'user',createdAt:serverTimestamp()}); }
+    else if(adminMail&&(!snap.data().approved||snap.data().role!=='admin')){ await updateDoc(ref,{approved:true,role:'admin'}); }
+  }catch(e){ console.error(e); toast('Benutzerprofil konnte nicht geladen werden. Firestore-Regeln prüfen.'); }
+  unsub.push(onSnapshot(ref,s=>{
+    profile=s.data()||{}; isAdmin=adminMail||(profile.approved&&profile.role==='admin');
+    if(adminMail||profile.approved){ if($('#app').classList.contains('hidden')) startApp(); else render(); }
+    else { show('#auth',false); show('#app',false); $('#pendingMail').textContent=u.email; show('#pending'); }
+  }));
+});
+
+function startApp(){
+  show('#auth',false); show('#pending',false); show('#app'); $('#whoMail').textContent=user.email;
+  unsub.push(onSnapshot(doc(db,'settings','main'),s=>{
+    const data=s.data()||{}; S={...DEFAULT_SETTINGS,...data}; if(!Array.isArray(S.katalog)||!S.katalog.length)S.katalog=DEFAULT_KATALOG;
+    if(!s.exists()&&isAdmin) setDoc(doc(db,'settings','main'),DEFAULT_SETTINGS).catch(console.error);
+    setLogos(); render();
+  },e=>console.error(e)));
+  unsub.push(onSnapshot(collection(db,'invoices'),qs=>{
+    invoices=qs.docs.map(d=>({id:d.id,...d.data()})); render();
+  },e=>{console.error(e); toast('Rechnungen konnten nicht geladen werden: '+e.code);}));
+  if(isAdmin) unsub.push(onSnapshot(collection(db,'users'),qs=>{users=qs.docs.map(d=>({id:d.id,...d.data()})); if(tab==='settings')renderSettings();},e=>console.error(e)));
+  render();
+}
+
+/* ---------- Liste ---------- */
+const isLate=i=>{ if(i.status!=='gesendet'||!i.sentDate)return false; const d=new Date(i.sentDate); d.setDate(d.getDate()+(+S.zahlungsfrist||30)); return d<new Date(todayIso()); };
+const totalOf=i=>calcTotals(i,S).total;
+
+function render(){
+  if(!user)return;
+  const by=s=>invoices.filter(i=>i.status===s);
+  const sum=a=>a.reduce((s,i)=>s+totalOf(i),0);
+  const neu=by('neu'),ges=by('gesendet'),arc=by('bezahlt');
+  $('#cNeu').textContent=neu.length; $('#cGes').textContent=ges.length; $('#cArc').textContent=arc.length;
+  $('#sNeu').textContent=`CHF ${fmt(sum(neu))}`; $('#sGes').textContent=`CHF ${fmt(sum(ges))} offen`; $('#sArc').textContent=`CHF ${fmt(sum(arc))} bezahlt`;
+  document.querySelectorAll('.flow [data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab&&!search)));
+  const inSettings=tab==='settings'&&!search;
+  show('#listView',!inSettings); show('#settingsView',inSettings);
+  if(inSettings){renderSettings();return;}
+  renderList();
+}
+
+function renderList(){
+  let list;
+  if(search){
+    const q=search.toLowerCase();
+    list=invoices.filter(i=>[i.nr,i.kunde,i.auftragsnr,i.objekt,i.memo,i.bemerkung,isoToCh(i.datum),fmt(totalOf(i))].join(' ').toLowerCase().includes(q));
+    $('#listHint').textContent=`${list.length} Treffer für «${search}» in allen Bereichen`;
+  } else {
+    list=invoices.filter(i=>i.status===tab);
+    $('#listHint').textContent={neu:'Rechnungen bleiben hier, bis sie als PDF exportiert sind.',gesendet:'Exportierte Rechnungen. Mit «Bezahlt» kommen sie ins Archiv.',bezahlt:'Bezahlte Rechnungen.'}[tab]||'';
+  }
+  show('#btnExportAll',!search&&tab==='neu'&&list.length>1);
+  list.sort((a,b)=>String(b.nr||'').localeCompare(String(a.nr||''))||String(b.datum||'').localeCompare(String(a.datum||'')));
+  if(!list.length){
+    $('#listWrap').innerHTML=search?`<div class="empty"><strong>Nichts gefunden</strong>Andere Schreibweise oder die Auftrags-Nr. versuchen.</div>`
+      :({neu:`<div class="empty"><strong>Keine neuen Rechnungen</strong>Importiere die Monteur-Abrechnung als PDF oder erstelle eine Rechnung von Hand.</div>`,
+         gesendet:`<div class="empty"><strong>Keine offenen Rechnungen</strong>Sobald du eine Rechnung als PDF exportierst, erscheint sie hier.</div>`,
+         bezahlt:`<div class="empty"><strong>Archiv ist leer</strong>Bezahlte Rechnungen landen hier.</div>`})[tab];
+    return;
+  }
+  const lbl={neu:'Neu',gesendet:'Gesendet',bezahlt:'Bezahlt'};
+  $('#listWrap').innerHTML=`<table class="list"><thead><tr><th>Rechnungs-Nr.</th><th>Datum / KW</th><th>Kunde / Objekt</th><th>Auftrags-Nr.</th><th class="num">Betrag CHF</th><th></th></tr></thead><tbody>${
+    list.map(i=>{
+      const late=isLate(i);
+      let acts='';
+      if(i.status==='neu') acts=`<button class="btn small primary" data-act="pdf" data-id="${i.id}">PDF exportieren</button>`;
+      if(i.status==='gesendet') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="remind" data-id="${i.id}">Erinnerung</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
+      if(i.status==='bezahlt') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="unpaid" data-id="${i.id}">Zurück zu Gesendet</button>`;
+      return `<tr class="row" data-open="${i.id}">
+        <td><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${i.status}">${lbl[i.status]}</span></div>`:''}</td>
+        <td>${esc(isoToCh(i.datum))}<div class="sub">KW ${esc(kw2(i.kw))}${i.sentDate?` · gesendet ${esc(isoToCh(i.sentDate))}`:''}</div></td>
+        <td><strong>${esc(i.kunde||'—')}</strong><div class="sub">${esc(i.objekt||'')}</div></td>
+        <td>${i.auftragsnr?esc(i.auftragsnr):'<span class="badge miss">fehlt</span>'}</td>
+        <td class="num"><strong>${fmt(totalOf(i))}</strong>${late?'<div><span class="badge late">überfällig</span></div>':''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
+        <td class="acts">${acts}</td></tr>`;}).join('')}</tbody></table>`;
+}
+
+/* ---------- Rechnungsnummer YYYY.MM.DD.NN ---------- */
+async function nextNumber(iso){
+  const key=(iso||todayIso()).replace(/-/g,''); const ref=doc(db,'counters',key);
+  const n=await runTransaction(db,async tx=>{const s=await tx.get(ref); const n=(s.exists()?s.data().n:0)+1; tx.set(ref,{n}); return n;});
+  return (iso||todayIso()).replace(/-/g,'.')+'.'+String(n).padStart(2,'0');
+}
+function catItem(key){return S.katalog.find(k=>k.key===key);}
+function posFromCat(key,menge=0){const c=catItem(key)||{bez:key,einheit:'',preis:0}; return {key, bez:c.bez, einheit:c.einheit, menge, preis:+c.preis||0};}
+function blankInvoice(){return {status:'neu',nr:'',datum:todayIso(),kw:isoWeek(todayIso()),auftragsDatum:'',kunde:'',auftragsnr:'',objekt:'',bemerkung:'',memo:'',empfaenger:S.empfaenger,erinnerung:'',mwstSatz:S.mwstSatz,positionen:[]};}
+function plain(o){return JSON.parse(JSON.stringify(o));}
+
+async function saveInvoice(inv){
+  const data=plain(inv); const id=data.id; delete data.id;
+  const T=calcTotals(data,S); data.total=T.total; data.updatedAt=serverTimestamp(); data.updatedBy=user.email;
+  if(!id){ if(!data.nr) data.nr=await nextNumber(data.datum); data.createdAt=serverTimestamp(); data.createdBy=user.email; const ref=await addDoc(collection(db,'invoices'),data); inv.id=ref.id; inv.nr=data.nr; }
+  else await updateDoc(doc(db,'invoices',id),data);
+  return inv;
+}
+
+async function exportPdf(inv){
+  if(!inv.auftragsnr&&!confirm('Auftrags-Nr. fehlt. Trotzdem exportieren?'))return false;
+  if(!calcTotals(inv,S).total&&!confirm('Der Rechnungsbetrag ist 0.00. Trotzdem exportieren?'))return false;
+  if(!inv.id||dirty) await saveInvoice(inv);
+  const pdf=buildPdf(inv,S,logoInfo); pdf.save(pdfFileName(inv,S));
+  if(inv.status==='neu'){ await updateDoc(doc(db,'invoices',inv.id),{status:'gesendet',sentDate:todayIso(),sentAt:serverTimestamp()}); inv.status='gesendet'; toast(`${inv.nr} exportiert und unter «Gesendet» abgelegt`); }
+  return true;
+}
+
+/* ---------- Editor ---------- */
+function openEditor(inv){ draft=plain(inv); if(inv.id)draft.id=inv.id; dirty=false; renderEditor(); }
+function closeEditor(force){ if(!force&&dirty&&!confirm('Änderungen verwerfen?'))return; draft=null; dirty=false; show('#overlay',false); $('#overlay').innerHTML=''; }
+
+function renderEditor(){
+  const d=draft; const st=d.status||'neu';
+  let btns=`<button class="btn" data-act="close">Schliessen</button><button class="btn" data-act="save">Speichern</button>`;
+  if(st==='neu') btns+=`<button class="btn primary" data-act="edPdf">PDF exportieren</button>`;
+  if(st==='gesendet') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn ok" data-act="edPaid">Bezahlt</button>`;
+  if(st==='bezahlt') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn" data-act="edUnpaid">Zurück zu Gesendet</button>`;
+  const F=(f,l,type='text',extra='')=>`<label>${l}<input type="${type}" data-f="${f}" value="${esc(d[f]??'')}" ${extra}></label>`;
+  $('#overlay').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Rechnung bearbeiten">
+    <div class="sheet-head"><h2>${d.id?`Rechnung ${esc(d.nr)}`:'Neue Rechnung'}</h2>${btns}</div>
+    <div class="sheet-body">
+      <div class="card"><h3>Auftrag</h3><div class="grid">
+        ${F('kunde','Kunde')}
+        <label>Auftrags-Nr.<input data-f="auftragsnr" value="${esc(d.auftragsnr)}" inputmode="numeric">${d.auftragsnr?'':'<div class="warnline">Auftrags-Nr. fehlt</div>'}</label>
+        <label class="wide">Objekt / Adresse der Baustelle<input data-f="objekt" value="${esc(d.objekt)}"></label>
+        ${F('auftragsDatum','Montagedatum','date')}
+        ${F('bemerkung','Zusatz auf Rechnung (z. B. Haus 6a, Monteur)')}
+        ${d.memo?`<label class="wide">Memo aus Import (nur intern)<textarea data-f="memo" rows="2">${esc(d.memo)}</textarea></label>`:''}
+      </div></div>
+      <div class="card"><h3>Positionen</h3>
+        <div class="chips">${S.katalog.map(k=>`<button class="chip" data-act="addCat" data-key="${esc(k.key)}">+ ${esc(k.bez)}</button>`).join('')}<button class="chip" data-act="addFree">+ Freie Position</button></div>
+        <table class="pos"><thead><tr><th>Bezeichnung</th><th style="width:110px">Menge</th><th style="width:90px">Einheit</th><th style="width:120px">Preis CHF</th><th style="width:120px;text-align:right">Total CHF</th><th style="width:36px"></th></tr></thead>
+        <tbody id="posBody"></tbody></table>
+        <div class="totals" id="totals"></div>
+      </div>
+      <div class="card"><h3>Rechnung</h3><div class="grid">
+        ${F('nr','Rechnungs-Nr.','text',d.id?'':'placeholder="wird automatisch vergeben"')}
+        ${F('datum','Rechnungsdatum','date')}
+        ${F('kw','KW','number','min="1" max="53"')}
+        ${F('mwstSatz','MwSt %','number','step="0.1"')}
+        ${F('erinnerung','Erinnerung (Datum, optional)','date')}
+        <label class="wide">Empfänger<textarea data-f="empfaenger" rows="3">${esc(d.empfaenger)}</textarea></label>
+      </div></div>
+      ${d.id?`<div><button class="btn warn" data-act="delete">Rechnung löschen</button></div>`:''}
+    </div></div>`;
+  show('#overlay'); renderPositions();
+}
+
+function renderPositions(){
+  const d=draft; const units=['m²','h','Stk','lm','pauschal'];
+  $('#posBody').innerHTML=d.positionen.length?d.positionen.map((p,i)=>`<tr>
+    <td><input data-pi="${i}" data-pf="bez" value="${esc(p.bez)}" aria-label="Bezeichnung"></td>
+    <td><input data-pi="${i}" data-pf="menge" type="number" step="0.01" inputmode="decimal" value="${esc(p.menge)}" aria-label="Menge"></td>
+    <td><input data-pi="${i}" data-pf="einheit" list="units" value="${esc(p.einheit)}" aria-label="Einheit"></td>
+    <td><input data-pi="${i}" data-pf="preis" type="number" step="0.05" inputmode="decimal" value="${esc(p.preis)}" aria-label="Preis"></td>
+    <td class="tot" id="pt${i}">${fmt((+p.menge||0)*(+p.preis||0))}</td>
+    <td><button class="x" data-act="delPos" data-i="${i}" aria-label="Position entfernen">×</button></td></tr>`).join('')
+    :`<tr><td colspan="6" style="color:var(--muted);padding:1rem .3rem">Noch keine Position. Oben auswählen, was gemacht wurde.</td></tr>`;
+  if(!$('#units')){const dl=document.createElement('datalist');dl.id='units';dl.innerHTML=units.map(u=>`<option value="${u}">`).join('');document.body.appendChild(dl);}
+  renderTotals();
+}
+function renderTotals(){
+  const T=calcTotals(draft,S);
+  draft.positionen.forEach((p,i)=>{const c=$('#pt'+i); if(c)c.textContent=fmt((+p.menge||0)*(+p.preis||0));});
+  $('#totals').innerHTML=`<div><span>Zwischensumme</span><span>${fmt(T.sub)}</span></div><div><span>MwSt ${fmtQty(T.rate)} %</span><span>${fmt(T.mwst)}</span></div><div class="grand"><span>Rechnungsbetrag CHF</span><span>${fmt(T.total)}</span></div>`;
+}
+
+$('#overlay').addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.f&&draft){ let v=t.value; if(t.type==='number')v=v===''?'':+v; draft[t.dataset.f]=v; dirty=true;
+    if(t.dataset.f==='auftragsDatum'&&t.value){draft.kw=isoWeek(t.value); const k=$('[data-f="kw"]'); if(k)k.value=draft.kw;}
+    if(t.dataset.f==='mwstSatz')renderTotals(); }
+  if(t.dataset.pi!=null&&draft){ const p=draft.positionen[+t.dataset.pi]; let v=t.value; if(t.type==='number')v=v===''?0:+v; p[t.dataset.pf]=v; dirty=true; renderTotals(); }
+  if(t.dataset.ii!=null){ importRows[+t.dataset.ii][t.dataset.if]=t.type==='checkbox'?t.checked:t.value; if(t.type==='checkbox')updImportBtn(); }
+});
+$('#overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') (draft?closeEditor():closeImport()); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('#overlay').classList.contains('hidden')) (draft?closeEditor():closeImport()); });
+
+/* ---------- Import ---------- */
+$('#pdfInput').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  try{
+    toast('PDF wird gelesen …');
+    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+    const rows=await parseListPdf(pdf); pdf.destroy();
+    if(!rows.length){toast('In dieser PDF wurden keine Aufträge gefunden.');return;}
+    const existing=new Set(invoices.map(i=>i.importKey).filter(Boolean));
+    importRows=rows.map(r=>{const key=`${r.auftragsnr}|${r.datum}|${r.kunde}`.toUpperCase(); const dup=existing.has(key); return {...r,importKey:key,dup,sel:!dup,sug:suggestPositions(r.memo)};});
+    renderImport();
+  }catch(err){console.error(err); toast('PDF konnte nicht gelesen werden.');}
+});
+function renderImport(){
+  const n=importRows.filter(r=>r.sel).length;
+  $('#overlay').innerHTML=`<div class="sheet wide" role="dialog" aria-modal="true" aria-label="Import prüfen">
+    <div class="sheet-head"><h2>Import prüfen</h2><button class="btn" data-act="closeImport">Abbrechen</button><button class="btn primary" data-act="doImport" id="impBtn">${n} Rechnungen anlegen</button></div>
+    <div class="sheet-body">
+      <p style="margin:0;color:var(--muted)">Kunde, Objektadresse und Auftrags-Nr. werden in jede Rechnung übernommen. Mengen aus dem Memo sind Vorschläge und lassen sich danach anpassen. Die PDF selbst wird nicht gespeichert, nur diese Daten.</p>
+      <div class="tablewrap"><table class="imp"><thead><tr><th></th><th>Datum</th><th>Kunde</th><th>Auftrags-Nr.</th><th>Objekt / Adresse</th><th>Memo und Vorschlag</th></tr></thead><tbody>
+      ${importRows.map((r,i)=>`<tr class="${r.dup?'dup':''}">
+        <td><input type="checkbox" data-ii="${i}" data-if="sel" ${r.sel?'checked':''} aria-label="Übernehmen"></td>
+        <td style="white-space:nowrap">${esc(r.datum)}${r.dup?'<div><span class="badge late">schon vorhanden</span></div>':''}</td>
+        <td><input data-ii="${i}" data-if="kunde" value="${esc(r.kunde)}"></td>
+        <td><input data-ii="${i}" data-if="auftragsnr" value="${esc(r.auftragsnr)}" style="width:120px">${r.auftragsnr?'':'<div class="warnline">fehlt</div>'}</td>
+        <td><input data-ii="${i}" data-if="adresse" value="${esc(r.adresse)}"></td>
+        <td><div class="memo">${esc(r.memo)}</div><div class="sug">${r.sug.map(s=>`${esc((catItem(s.key)||{}).bez||s.key)}${s.menge?` ${fmtQty(s.menge)} ${esc((catItem(s.key)||{}).einheit||'')}`:''}`).join(' · ')||'–'}</div></td>
+      </tr>`).join('')}</tbody></table></div>
+    </div></div>`;
+  show('#overlay');
+}
+function updImportBtn(){const n=importRows.filter(r=>r.sel).length; const b=$('#impBtn'); if(b)b.textContent=`${n} Rechnungen anlegen`;}
+function closeImport(){importRows=[]; show('#overlay',false); $('#overlay').innerHTML='';}
+async function doImport(){
+  const sel=importRows.filter(r=>r.sel); if(!sel.length)return;
+  const b=$('#impBtn'); b.disabled=true; let k=0;
+  for(const r of sel){
+    const ad=chToIso(r.datum);
+    const inv={...blankInvoice(),kunde:r.kunde,auftragsnr:r.auftragsnr,objekt:r.adresse,memo:r.memo,auftragsDatum:ad,kw:isoWeek(ad||todayIso()),importKey:r.importKey,
+      positionen:r.sug.map(s=>posFromCat(s.key,s.menge))};
+    try{await saveInvoice(inv); k++; b.textContent=`${k} / ${sel.length} angelegt …`;}catch(e){console.error(e); toast('Fehler beim Anlegen: '+(e.code||e.message)); break;}
+  }
+  closeImport(); tab='neu'; search=''; $('#search').value=''; render(); toast(`${k} Rechnungen unter «Neu» angelegt`);
+}
+
+/* ---------- Einstellungen ---------- */
+let setDraft=null;
+function renderSettings(){
+  if(!setDraft||!setDraft._dirty) setDraft=plain({...S,_dirty:false});
+  const s=setDraft, dis=isAdmin?'':'disabled';
+  const F=(f,l,type='text')=>`<label>${l}<input type="${type}" data-sf="${f}" value="${esc(s[f]??'')}" ${dis} ${type==='number'?'step="0.1"':''}></label>`;
+  const pend=users.filter(u=>!u.approved);
+  $('#settingsView').innerHTML=`
+    ${isAdmin?'':'<p class="card" style="margin:0 0 1rem">Nur Administratoren können die Einstellungen ändern.</p>'}
+    <div class="toolbar"><span class="hint">Firmen-, Bank- und Textangaben gelten für jedes PDF. Preise gelten für neu hinzugefügte Positionen.</span>${isAdmin?'<button class="btn primary" data-act="saveSettings">Einstellungen speichern</button>':''}</div>
+    <div class="settings-grid">
+      <div class="card"><h3>Firma</h3><div class="grid">
+        ${F('name','Firmenname')}${F('strasse','Strasse')}${F('plzOrt','PLZ / Ort')}${F('ort','Ort für Datum («Galgenen, den»)')}
+        ${F('ansprechpartner','Ansprechpartner')}${F('telefon','Telefon')}${F('email','E-Mail','email')}
+      </div></div>
+      <div class="card"><h3>Bank und Zahlung</h3><div class="grid">
+        ${F('bank','Bank')}${F('iban','IBAN')}${F('mwstNr','MWST-Nr.')}${F('mwstSatz','MwSt-Satz %','number')}
+        ${F('zahlungsfrist','Zahlungsfrist (Tage)','number')}
+        <label class="wide">Zahlungsbedingungen<input data-sf="zahlungstext" value="${esc(s.zahlungstext)}" ${dis}></label>
+        <label class="wide">Rundung MwSt und Total<select data-sf="rundung" ${dis}>
+          ${[['auf05','Auf 5 Rappen aufrunden'],['05','Auf 5 Rappen kaufmännisch'],['none','Keine Rundung']].map(([v,l])=>`<option value="${v}" ${(s.rundung||'auf05')===v?'selected':''}>${l}</option>`).join('')}</select></label>
+      </div></div>
+      <div class="card"><h3>Rechnungstext</h3><div class="grid">
+        <label class="wide">Standard-Empfänger<textarea data-sf="empfaenger" rows="3" ${dis}>${esc(s.empfaenger)}</textarea></label>
+        <label class="wide">Anrede<input data-sf="anrede" value="${esc(s.anrede)}" ${dis}></label>
+        <label class="wide">Einleitung<textarea data-sf="einleitung" rows="2" ${dis}>${esc(s.einleitung)}</textarea></label>
+        <label class="check wide"><input type="checkbox" data-sf="nullAusblenden" ${s.nullAusblenden?'checked':''} ${dis}> Positionen mit Menge 0 im PDF weglassen</label>
+      </div></div>
+      <div class="card"><h3>Logo</h3>
+        <div class="logo-prev"><img src="${esc(s.logo||DEFAULT_LOGO)}" alt="Logo-Vorschau"></div>
+        ${isAdmin?`<button class="btn small" data-act="pickLogo">Anderes Logo hochladen</button> ${s.logo?'<button class="btn small" data-act="resetLogo">Original-Logo verwenden</button>':''}`:''}
+      </div>
+      <div class="card full"><h3>Positionen und Preise</h3>
+        <table class="cat"><thead><tr><th>Bezeichnung</th><th style="width:110px">Einheit</th><th style="width:130px">Preis CHF</th><th style="width:40px"></th></tr></thead><tbody>
+        ${s.katalog.map((k,i)=>`<tr><td><input data-ci="${i}" data-cf="bez" value="${esc(k.bez)}" ${dis}></td><td><input data-ci="${i}" data-cf="einheit" value="${esc(k.einheit)}" list="units" ${dis}></td><td><input data-ci="${i}" data-cf="preis" type="number" step="0.05" value="${esc(k.preis)}" ${dis}></td><td>${isAdmin?`<button class="btn small warn" data-act="delCat" data-i="${i}" aria-label="Entfernen">×</button>`:''}</td></tr>`).join('')}
+        </tbody></table>
+        ${isAdmin?'<button class="btn small" data-act="addCatItem" style="margin-top:.6rem">Position hinzufügen</button>':''}
+      </div>
+      ${isAdmin?`<div class="card full"><h3>Benutzer${pend.length?` · ${pend.length} warten auf Freigabe`:''}</h3>
+        ${users.length?users.sort((a,b)=>(a.approved-b.approved)||String(a.email).localeCompare(b.email)).map(u=>{
+          const fixed=ADMIN_EMAILS.includes(String(u.email).toLowerCase()); const me=u.id===user.uid;
+          return `<div class="userrow"><span class="em">${esc(u.email)}</span>
+            <span class="badge ${u.approved?'bezahlt':'neu'}">${u.approved?'freigeschaltet':'wartet'}</span>
+            ${u.role==='admin'?'<span class="badge gesendet">Admin</span>':''}
+            ${fixed||me?'':`${u.approved?`<button class="btn small warn" data-act="uBlock" data-id="${u.id}">Sperren</button>`:`<button class="btn small primary" data-act="uApprove" data-id="${u.id}">Freigeben</button>`}
+            <button class="btn small" data-act="uRole" data-id="${u.id}">${u.role==='admin'?'Admin entfernen':'Zum Admin machen'}</button>
+            <button class="btn small warn" data-act="uDel" data-id="${u.id}">Entfernen</button>`}</div>`;}).join(''):'<p style="color:var(--muted)">Noch keine Benutzer.</p>'}
+      </div>`:''}
+    </div>`;
+  if(!$('#units')){const dl=document.createElement('datalist');dl.id='units';dl.innerHTML=['m²','h','Stk','lm','pauschal'].map(u=>`<option value="${u}">`).join('');document.body.appendChild(dl);}
+}
+$('#settingsView').addEventListener('input',e=>{
+  const t=e.target; if(!setDraft)return;
+  if(t.dataset.sf){setDraft[t.dataset.sf]=t.type==='checkbox'?t.checked:(t.type==='number'?+t.value:t.value); setDraft._dirty=true;}
+  if(t.dataset.ci!=null){const k=setDraft.katalog[+t.dataset.ci]; k[t.dataset.cf]=t.type==='number'?+t.value:t.value; setDraft._dirty=true;}
+});
+$('#logoInput').addEventListener('change',e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  const img=new Image(); img.onload=()=>{ const w=Math.min(1200,img.naturalWidth), h=Math.round(img.naturalHeight*w/img.naturalWidth);
+    const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,w,h); x.drawImage(img,0,0,w,h);
+    setDraft.logo=c.toDataURL('image/jpeg',.9); setDraft._dirty=true; renderSettings(); URL.revokeObjectURL(img.src); toast('Logo geladen. Zum Übernehmen speichern.'); };
+  img.src=URL.createObjectURL(f);
+});
+
+/* ---------- Klick-Aktionen ---------- */
+document.addEventListener('click',async e=>{
+  const tabBtn=e.target.closest('[data-tab]');
+  if(tabBtn){ tab=tabBtn.dataset.tab; search=''; $('#search').value=''; render(); return; }
+  const actEl=e.target.closest('[data-act]');
+  const row=!actEl&&e.target.closest('[data-open]');
+  if(row){const inv=invoices.find(i=>i.id===row.dataset.open); if(inv)openEditor(inv); return;}
+  if(!actEl)return;
+  const a=actEl.dataset.act, id=actEl.dataset.id, inv=id?invoices.find(i=>i.id===id):null;
+  try{
+    switch(a){
+      case 'logout': await signOut(auth); break;
+      case 'new': openEditor(blankInvoice()); break;
+      case 'import': $('#pdfInput').click(); break;
+      case 'closeImport': closeImport(); break;
+      case 'doImport': await doImport(); break;
+      case 'exportAll': {
+        const list=invoices.filter(i=>i.status==='neu');
+        if(!confirm(`${list.length} Rechnungen als PDF exportieren und nach «Gesendet» verschieben? Der Browser fragt eventuell, ob mehrere Downloads erlaubt sind.`))break;
+        for(const i of list){ const c=plain(i); c.id=i.id; await exportPdf(c); await new Promise(r=>setTimeout(r,450)); }
+        break; }
+      case 'pdf': { const c=plain(inv); c.id=inv.id; await exportPdf(c); break; }
+      case 'remind': { const c=plain(inv); c.id=inv.id; c.erinnerung=todayIso(); await updateDoc(doc(db,'invoices',id),{erinnerung:c.erinnerung}); buildPdf(c,S,logoInfo).save(pdfFileName(c,S).replace('.pdf',' - Erinnerung.pdf')); toast('Erinnerung erstellt'); break; }
+      case 'paid': await updateDoc(doc(db,'invoices',id),{status:'bezahlt',paidDate:todayIso(),paidAt:serverTimestamp()}); toast(`${inv.nr} ist bezahlt und im Archiv`); break;
+      case 'unpaid': await updateDoc(doc(db,'invoices',id),{status:'gesendet',paidDate:'',paidAt:null}); toast(`${inv.nr} zurück unter «Gesendet»`); break;
+      // Editor
+      case 'close': closeEditor(); break;
+      case 'save': await saveInvoice(draft); dirty=false; toast(`${draft.nr} gespeichert`); renderEditor(); break;
+      case 'edPdf': { const ok=await exportPdf(draft); if(ok){dirty=false; closeEditor(true);} break; }
+      case 'edPaid': await saveInvoice(draft); await updateDoc(doc(db,'invoices',draft.id),{status:'bezahlt',paidDate:todayIso(),paidAt:serverTimestamp()}); toast(`${draft.nr} ist bezahlt und im Archiv`); closeEditor(true); break;
+      case 'edUnpaid': await saveInvoice(draft); await updateDoc(doc(db,'invoices',draft.id),{status:'gesendet',paidDate:'',paidAt:null}); closeEditor(true); break;
+      case 'delete': if(confirm(`Rechnung ${draft.nr} endgültig löschen?`)){ await deleteDoc(doc(db,'invoices',draft.id)); toast(`${draft.nr} gelöscht`); closeEditor(true);} break;
+      case 'addCat': draft.positionen.push(posFromCat(actEl.dataset.key,0)); dirty=true; renderPositions(); { const inp=document.querySelector(`[data-pi="${draft.positionen.length-1}"][data-pf="menge"]`); inp&&inp.focus(); } break;
+      case 'addFree': draft.positionen.push({key:'frei',bez:'',einheit:'m²',menge:0,preis:0}); dirty=true; renderPositions(); { const inp=document.querySelector(`[data-pi="${draft.positionen.length-1}"][data-pf="bez"]`); inp&&inp.focus(); } break;
+      case 'delPos': draft.positionen.splice(+actEl.dataset.i,1); dirty=true; renderPositions(); break;
+      // Einstellungen
+      case 'saveSettings': { const d=plain(setDraft); delete d._dirty; d.katalog=d.katalog.filter(k=>k.bez).map((k,i)=>({...k,key:k.key||('pos'+Date.now()+i),preis:+k.preis||0}));
+        await setDoc(doc(db,'settings','main'),d); setDraft=null; toast('Einstellungen gespeichert'); break; }
+      case 'addCatItem': setDraft.katalog.push({key:'pos'+Date.now(),bez:'',einheit:'m²',preis:0}); setDraft._dirty=true; renderSettings(); break;
+      case 'delCat': setDraft.katalog.splice(+actEl.dataset.i,1); setDraft._dirty=true; renderSettings(); break;
+      case 'pickLogo': $('#logoInput').click(); break;
+      case 'resetLogo': setDraft.logo=''; setDraft._dirty=true; renderSettings(); break;
+      case 'uApprove': await updateDoc(doc(db,'users',id),{approved:true,approvedBy:user.email}); toast('Benutzer freigeschaltet'); break;
+      case 'uBlock': await updateDoc(doc(db,'users',id),{approved:false}); toast('Benutzer gesperrt'); break;
+      case 'uRole': { const u=users.find(x=>x.id===id); await updateDoc(doc(db,'users',id),{role:u.role==='admin'?'user':'admin'}); break; }
+      case 'uDel': if(confirm('Benutzer entfernen? Das Login bleibt in Firebase bestehen, hat aber keinen Zugriff mehr.')){ await deleteDoc(doc(db,'users',id)); } break;
+    }
+  }catch(err){ console.error(err); toast('Fehler: '+(err.code||err.message)); }
+});
+
+let sT; $('#search').addEventListener('input',e=>{clearTimeout(sT); sT=setTimeout(()=>{search=e.target.value.trim(); render();},150);});
+window.addEventListener('beforeunload',e=>{ if(dirty||(setDraft&&setDraft._dirty)){e.preventDefault();e.returnValue='';} });
+</script>
+</body>
+</html>
