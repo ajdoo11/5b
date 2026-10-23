@@ -18,14 +18,6 @@
   --shadow:0 1px 0 rgba(21,77,114,.08);
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    --petrol:#5c9cc8; --petrol-2:#7fb3d8; --petrol-soft:#1c3446;
-    --gips:#12181d; --panel:#1a2229; --line:#2c3842; --text:#e4eaef; --muted:#93a2ad;
-    --orange:#f0a050; --red:#e8695f; --green:#5cbf86; --field:#141b21;
-    --shadow:none; color-scheme:dark;
-  }
-}
 *{box-sizing:border-box}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html,body{margin:0;background:var(--gips);color:var(--text);font:15px/1.45 "Barlow",system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
@@ -78,6 +70,10 @@ main{max-width:1240px;margin:0 auto;padding:1.2rem}
 .flow .s{font-size:12px;color:var(--muted)}
 .flow button[aria-selected="true"]{background:var(--petrol);color:#fff}
 .flow button[aria-selected="true"] .n,.flow button[aria-selected="true"] .t,.flow button[aria-selected="true"] .s{color:#fff}
+.flow button.mahn .n{color:var(--red)}
+.flow button.mahn.alert{background:#fbe9e7}
+.flow button.mahn[aria-selected="true"]{background:var(--red)}
+.flow button.mahn[aria-selected="true"] .n{color:#fff}
 .flow button.settings{flex:0 0 auto;min-width:0;clip-path:none;border:1px solid var(--line);border-radius:6px;margin-left:16px;padding:.75rem 1rem}
 
 .toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem}
@@ -249,6 +245,7 @@ table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
     <nav class="flow" role="tablist" aria-label="Rechnungsstatus">
       <button role="tab" data-tab="neu"><span class="n" id="cNeu">0</span><span class="t">Neu</span><br><span class="s" id="sNeu">noch nicht exportiert</span></button>
       <button role="tab" data-tab="gesendet"><span class="n" id="cGes">0</span><span class="t">Gesendet</span><br><span class="s" id="sGes">offen</span></button>
+      <button role="tab" data-tab="mahnung" class="mahn"><span class="n" id="cMahn">0</span><span class="t">Achtung Mahnung</span><br><span class="s" id="sMahn">über 30 Tage offen</span></button>
       <button role="tab" data-tab="bezahlt"><span class="n" id="cArc">0</span><span class="t">Archiv</span><br><span class="s" id="sArc">bezahlt</span></button>
       <button role="tab" data-tab="settings" class="settings" aria-label="Einstellungen"><span class="t">Einstellungen</span></button>
     </nav>
@@ -583,14 +580,17 @@ function startApp(){
 }
 
 /* ---------- Liste ---------- */
-const isLate=i=>{ if(i.status!=='gesendet'||!i.sentDate)return false; const d=new Date(i.sentDate); d.setDate(d.getDate()+(+S.zahlungsfrist||30)); return d<new Date(todayIso()); };
+const daysOpen=i=>{ if(!i.sentDate)return 0; return Math.floor((new Date(todayIso())-new Date(i.sentDate))/86400000); };
+const isLate=i=>i.status==='gesendet'&&!!i.sentDate&&daysOpen(i)>(+S.zahlungsfrist||30);
+const viewOf=i=>i.status==='gesendet'?(isLate(i)?'mahnung':'gesendet'):i.status;
 const totalOf=i=>calcTotals(i,S).total;
 
 function render(){
   if(!user)return;
-  const by=s=>invoices.filter(i=>i.status===s);
+  const by=s=>invoices.filter(i=>viewOf(i)===s);
   const sum=a=>a.reduce((s,i)=>s+totalOf(i),0);
-  const neu=by('neu'),ges=by('gesendet'),arc=by('bezahlt');
+  const neu=by('neu'),ges=by('gesendet'),mahn=by('mahnung'),arc=by('bezahlt');
+  $('#cMahn').textContent=mahn.length; $('#sMahn').textContent=mahn.length?`CHF ${fmt(sum(mahn))} überfällig`:`über ${+S.zahlungsfrist||30} Tage offen`; document.querySelector('.flow .mahn').classList.toggle('alert',mahn.length>0);
   $('#cNeu').textContent=neu.length; $('#cGes').textContent=ges.length; $('#cArc').textContent=arc.length;
   $('#sNeu').textContent=`CHF ${fmt(sum(neu))}`; $('#sGes').textContent=`CHF ${fmt(sum(ges))} offen`; $('#sArc').textContent=`CHF ${fmt(sum(arc))} bezahlt`;
   document.querySelectorAll('.flow [data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab&&!search)));
@@ -607,19 +607,20 @@ function renderList(){
     list=invoices.filter(i=>[i.nr,i.kunde,i.auftragsnr,i.objekt,i.memo,i.bemerkung,isoToCh(i.datum),fmt(totalOf(i))].join(' ').toLowerCase().includes(q));
     $('#listHint').textContent=`${list.length} Treffer für «${search}» in allen Bereichen`;
   } else {
-    list=invoices.filter(i=>i.status===tab);
-    $('#listHint').textContent={neu:'Rechnungen bleiben hier, bis sie als PDF exportiert sind.',gesendet:'Exportierte Rechnungen. Mit «Bezahlt» kommen sie ins Archiv.',bezahlt:'Bezahlte Rechnungen.'}[tab]||'';
+    list=invoices.filter(i=>viewOf(i)===tab);
+    $('#listHint').textContent={neu:'Rechnungen bleiben hier, bis sie als PDF exportiert sind.',gesendet:`Exportierte Rechnungen. Nach ${+S.zahlungsfrist||30} Tagen ohne Zahlung kommen sie unter «Achtung Mahnung».`,mahnung:'Diese Rechnungen sind überfällig. Erinnerung senden oder als bezahlt markieren.',bezahlt:'Bezahlte Rechnungen.'}[tab]||'';
   }
   show('#btnExportAll',!search&&tab==='neu'&&list.length>1);
   list.sort((a,b)=>String(b.nr||'').localeCompare(String(a.nr||''))||String(b.datum||'').localeCompare(String(a.datum||'')));
   if(!list.length){
     $('#listWrap').innerHTML=search?`<div class="empty"><strong>Nichts gefunden</strong>Andere Schreibweise oder die Auftrags-Nr. versuchen.</div>`
       :({neu:`<div class="empty"><strong>Keine neuen Rechnungen</strong>Importiere die Monteur-Abrechnung als PDF oder erstelle eine Rechnung von Hand.</div>`,
+         mahnung:`<div class="empty"><strong>Keine überfälligen Rechnungen</strong>Alles im grünen Bereich.</div>`,
          gesendet:`<div class="empty"><strong>Keine offenen Rechnungen</strong>Sobald du eine Rechnung als PDF exportierst, erscheint sie hier.</div>`,
          bezahlt:`<div class="empty"><strong>Archiv ist leer</strong>Bezahlte Rechnungen landen hier.</div>`})[tab];
     return;
   }
-  const lbl={neu:'Neu',gesendet:'Gesendet',bezahlt:'Bezahlt'};
+  const lbl={neu:'Neu',gesendet:'Gesendet',mahnung:'Mahnung',bezahlt:'Bezahlt'};
   $('#listWrap').innerHTML=`<table class="list"><thead><tr><th>Rechnungs-Nr.</th><th>Datum / KW</th><th>Kunde / Objekt</th><th>Auftrags-Nr.</th><th class="num">Betrag CHF</th><th></th></tr></thead><tbody>${
     list.map(i=>{
       const late=isLate(i);
@@ -627,12 +628,14 @@ function renderList(){
       if(i.status==='neu') acts=`<button class="btn small primary" data-act="pdf" data-id="${i.id}">PDF exportieren</button>`;
       if(i.status==='gesendet') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="remind" data-id="${i.id}">Erinnerung</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
       if(i.status==='bezahlt') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="unpaid" data-id="${i.id}">Zurück zu Gesendet</button>`;
+      if(late) acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small primary" data-act="remind" data-id="${i.id}">Erinnerung senden</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
+      acts+=`<button class="btn small warn" data-act="delRow" data-id="${i.id}" aria-label="Löschen">Löschen</button>`;
       return `<tr class="row" data-open="${i.id}">
-        <td><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${i.status}">${lbl[i.status]}</span></div>`:''}</td>
+        <td><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${viewOf(i)==='mahnung'?'late':i.status}">${lbl[viewOf(i)]}</span></div>`:''}</td>
         <td>${esc(isoToCh(i.datum))}<div class="sub">KW ${esc(kw2(i.kw))}${i.sentDate?` · gesendet ${esc(isoToCh(i.sentDate))}`:''}</div></td>
         <td><strong>${esc(i.kunde||'—')}</strong><div class="sub">${esc(i.objekt||'')}</div></td>
         <td>${i.auftragsnr?esc(i.auftragsnr):'<span class="badge miss">fehlt</span>'}</td>
-        <td class="num"><strong>${fmt(totalOf(i))}</strong>${late?'<div><span class="badge late">überfällig</span></div>':''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
+        <td class="num"><strong>${fmt(totalOf(i))}</strong>${late?`<div><span class="badge late">${daysOpen(i)} Tage offen</span></div>`:''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
         <td class="acts">${acts}</td></tr>`;}).join('')}</tbody></table>`;
 }
 
@@ -674,6 +677,7 @@ function renderEditor(){
   if(st==='neu') btns+=`<button class="btn primary" data-act="edPdf">PDF exportieren</button>`;
   if(st==='gesendet') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn ok" data-act="edPaid">Bezahlt</button>`;
   if(st==='bezahlt') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn" data-act="edUnpaid">Zurück zu Gesendet</button>`;
+  if(d.id) btns+=`<button class="btn warn" data-act="delete">Löschen</button>`;
   const F=(f,l,type='text',extra='')=>`<label>${l}<input type="${type}" data-f="${f}" value="${esc(d[f]??'')}" ${extra}></label>`;
   $('#overlay').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Rechnung bearbeiten">
     <div class="sheet-head"><h2>${d.id?`Rechnung ${esc(d.nr)}`:'Neue Rechnung'}</h2>${btns}</div>
@@ -700,7 +704,6 @@ function renderEditor(){
         ${F('erinnerung','Erinnerung (Datum, optional)','date')}
         <label class="wide">Empfänger<textarea data-f="empfaenger" rows="3">${esc(d.empfaenger)}</textarea></label>
       </div></div>
-      ${d.id?`<div><button class="btn warn" data-act="delete">Rechnung löschen</button></div>`:''}
     </div></div>`;
   show('#overlay'); renderPositions();
 }
@@ -869,6 +872,7 @@ document.addEventListener('click',async e=>{
         if(!confirm(`${list.length} Rechnungen als PDF exportieren und nach «Gesendet» verschieben? Der Browser fragt eventuell, ob mehrere Downloads erlaubt sind.`))break;
         for(const i of list){ const c=plain(i); c.id=i.id; await exportPdf(c); await new Promise(r=>setTimeout(r,450)); }
         break; }
+      case 'delRow': if(confirm(`Rechnung ${inv.nr} (${inv.kunde||''}) endgültig löschen?`)){ await deleteDoc(doc(db,'invoices',id)); toast(`${inv.nr} gelöscht`); } break;
       case 'pdf': { const c=plain(inv); c.id=inv.id; await exportPdf(c); break; }
       case 'remind': { const c=plain(inv); c.id=inv.id; c.erinnerung=todayIso(); await updateDoc(doc(db,'invoices',id),{erinnerung:c.erinnerung}); buildPdf(c,S,logoInfo).save(pdfFileName(c,S).replace('.pdf',' - Erinnerung.pdf')); toast('Erinnerung erstellt'); break; }
       case 'paid': await updateDoc(doc(db,'invoices',id),{status:'bezahlt',paidDate:todayIso(),paidAt:serverTimestamp()}); toast(`${inv.nr} ist bezahlt und im Archiv`); break;
