@@ -171,11 +171,23 @@ table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
 </head>
 <body>
 
-<!-- Einrichtungshinweis, falls Firebase-Konfiguration fehlt -->
+<!-- Einrichtung: Firebase-Konfiguration einfügen -->
 <div id="setup" class="setup hidden">
-  <h2>Firebase-Konfiguration fehlt</h2>
-  <p>Öffne diese Datei und trage im Abschnitt <code>firebaseConfig</code> die Werte aus der Firebase-Konsole ein (Projekteinstellungen → Allgemein → Deine Apps → Web-App).</p>
-  <p>Danach in der Firebase-Konsole unter Authentication die Anmeldemethode «E-Mail/Passwort» aktivieren und deine GitHub-Pages-Domain unter «Autorisierte Domains» eintragen.</p>
+  <h2>Firebase verbinden</h2>
+  <p>In der Firebase-Konsole: Zahnrad → Projekteinstellungen → Allgemein → «Deine Apps» → deine Web-App → «Konfiguration». Den ganzen Block mit <code>const firebaseConfig = { … }</code> kopieren und hier einfügen.</p>
+  <label>Firebase-Konfiguration<textarea id="cfgInput" rows="9" placeholder="const firebaseConfig = {&#10;  apiKey: &quot;AIza…&quot;,&#10;  authDomain: &quot;…firebaseapp.com&quot;,&#10;  …&#10;};"></textarea></label>
+  <div class="msg" id="cfgMsg"></div>
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+    <button class="btn primary" id="cfgDownload" type="button">Fertige index.html herunterladen</button>
+    <button class="btn" id="cfgUse" type="button">Nur in diesem Browser testen</button>
+  </div>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:0">Die heruntergeladene <code>index.html</code> auf GitHub hochladen und die alte Datei ersetzen. Danach funktioniert die App auf jedem Gerät.</p>
+</div>
+
+<!-- Konfiguration nur lokal aktiv -->
+<div id="cfgBanner" class="hidden" style="background:var(--orange);color:#fff;padding:.55rem 1.2rem;font-weight:600;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">
+  <span style="margin-right:auto">Firebase ist nur in diesem Browser verbunden. Lade die fertige index.html herunter und ersetze sie auf GitHub.</span>
+  <button class="btn small" id="cfgBannerDl" type="button" style="color:var(--text)">index.html herunterladen</button>
 </div>
 
 <!-- Anmeldung -->
@@ -192,6 +204,21 @@ table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
     <div class="links">
       <button class="linkbtn" id="authToggle" type="button">Neues Konto registrieren</button>
       <button class="linkbtn" id="authReset" type="button">Passwort vergessen</button>
+    </div>
+  </div>
+</section>
+
+<!-- E-Mail bestätigen (info@5b-gipser.ch) -->
+<section id="verify" class="center-screen hidden">
+  <div class="auth-card">
+    <img class="brandlogo" alt="5B Gipser GmbH">
+    <h2>E-Mail bestätigen</h2>
+    <p>Wir haben einen Bestätigungslink an <strong id="verifyMail"></strong> geschickt. Öffne den Link im Postfach, danach hier auf «Ich habe bestätigt» klicken. Erst dann werden die Admin-Rechte aktiv.</p>
+    <div class="msg" id="verifyMsg"></div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button class="btn primary" data-act="verifyCheck">Ich habe bestätigt</button>
+      <button class="btn" data-act="verifyResend">Link erneut senden</button>
+      <button class="btn" data-act="logout">Abmelden</button>
     </div>
   </div>
 </section>
@@ -428,13 +455,14 @@ function buildPdf(inv,S,logo){
 <!-- ===================== App mit Firebase ===================== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 /* ================================================================
    HIER DEINE FIREBASE-KONFIGURATION EINFÜGEN
    (Firebase-Konsole → Projekteinstellungen → Allgemein → Web-App)
    ================================================================ */
+/*CFG-START*/
 const firebaseConfig = {
   apiKey: "DEIN_API_KEY",
   authDomain: "DEIN_PROJEKT.firebaseapp.com",
@@ -443,10 +471,16 @@ const firebaseConfig = {
   messagingSenderId: "000000000000",
   appId: "1:000000000000:web:0000000000000000"
 };
+/*CFG-END*/
 
-/* Diese E-Mails sind automatisch Administrator und sofort freigeschaltet.
-   Muss mit der Liste in den Firestore-Regeln übereinstimmen. */
-const ADMIN_EMAILS = ['info@5b-gipser.ch','admin@5b.ch'];
+/* Admins (muss mit den Firestore-Regeln übereinstimmen):
+   - admin@5b.ch ist sofort Admin
+   - info@5b-gipser.ch wird Admin, sobald die E-Mail-Adresse bestätigt ist */
+const INSTANT_ADMINS = ['admin@5b.ch'];
+const VERIFIED_ADMINS = ['info@5b-gipser.ch'];
+const ADMIN_EMAILS = [...INSTANT_ADMINS, ...VERIFIED_ADMINS];
+const needsVerify = u => VERIFIED_ADMINS.includes((u.email||'').toLowerCase()) && !u.emailVerified;
+const isAdminMailUser = u => { const e=(u.email||'').toLowerCase(); return INSTANT_ADMINS.includes(e) || (VERIFIED_ADMINS.includes(e) && u.emailVerified); };
 
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -455,9 +489,37 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const show=(id,on=true)=>$(id).classList.toggle('hidden',!on);
 let toastT; function toast(m){let t=$('.toast'); if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t);} t.textContent=m; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',3200);}
 
-if(!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('DEIN')){ show('#setup'); throw new Error('Firebase-Konfiguration fehlt'); }
+/* ---------- Einrichtung ---------- */
+const CFG_KEY='5b-firebase-config';
+function parseCfg(txt){
+  const keys=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId']; const c={};
+  for(const k of keys){ const m=String(txt).match(new RegExp(k+'["\']?\\s*:\\s*["\']([^"\']+)["\']')); if(m)c[k]=m[1].trim(); }
+  if(!c.apiKey||!c.projectId||!c.appId) throw new Error('Im eingefügten Text fehlen apiKey, projectId oder appId. Bitte den ganzen Block kopieren.');
+  if(!c.authDomain)c.authDomain=c.projectId+'.firebaseapp.com';
+  return c;
+}
+function cfgBlock(c){ return 'const firebaseConfig = '+JSON.stringify(c,null,2).replace(/"(\w+)":/g,'$1:')+';'; }
+async function downloadConfiguredHtml(c){
+  const res=await fetch(location.href.split('#')[0].split('?')[0],{cache:'no-store'});
+  if(!res.ok) throw new Error('Die Seite konnte nicht geladen werden ('+res.status+').');
+  let html=await res.text(); const A='/*'+'CFG-START*/', B='/*'+'CFG-END*/';
+  const i=html.indexOf(A), j=html.indexOf(B);
+  if(i<0||j<0) throw new Error('Markierung in der Datei nicht gefunden.');
+  html=html.slice(0,i+A.length)+'\n'+cfgBlock(c)+'\n'+html.slice(j);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='index.html'; document.body.appendChild(a); a.click(); a.remove();
+}
+const placeholder=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('DEIN');
+let activeCfg=firebaseConfig;
+if(placeholder){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem(CFG_KEY)||'null'); }catch(e){}
+  $('#cfgDownload').onclick=async()=>{ $('#cfgMsg').textContent=''; try{ const c=parseCfg($('#cfgInput').value); localStorage.setItem(CFG_KEY,JSON.stringify(c)); await downloadConfiguredHtml(c); $('#cfgMsg').style.color='var(--green)'; $('#cfgMsg').textContent='index.html wurde heruntergeladen. Jetzt auf GitHub hochladen und die alte Datei ersetzen.'; }catch(e){ $('#cfgMsg').style.color=''; $('#cfgMsg').textContent=e.message; } };
+  $('#cfgUse').onclick=()=>{ $('#cfgMsg').textContent=''; try{ localStorage.setItem(CFG_KEY,JSON.stringify(parseCfg($('#cfgInput').value))); location.reload(); }catch(e){ $('#cfgMsg').textContent=e.message; } };
+  if(!saved||!saved.apiKey){ show('#setup'); throw new Error('Firebase-Konfiguration fehlt'); }
+  activeCfg=saved;
+  show('#cfgBanner'); $('#cfgBannerDl').onclick=()=>downloadConfiguredHtml(saved).catch(e=>toast(e.message));
+}
 
-const fb=initializeApp(firebaseConfig);
+const fb=initializeApp(activeCfg);
 const auth=getAuth(fb);
 let db; try{ db=initializeFirestore(fb,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})}); }catch(e){ db=initializeFirestore(fb,{}); }
 
@@ -482,13 +544,15 @@ let regMode=false;
 $('#authToggle').onclick=()=>{regMode=!regMode; $('#authTitle').textContent=regMode?'Registrieren':'Anmelden'; $('#authBtn').textContent=regMode?'Konto erstellen':'Anmelden'; $('#authToggle').textContent=regMode?'Ich habe bereits ein Konto':'Neues Konto registrieren'; $('#authPass').autocomplete=regMode?'new-password':'current-password'; $('#authMsg').textContent='';};
 $('#authReset').onclick=async()=>{const e=$('#authEmail').value.trim(); if(!e){$('#authMsg').textContent='Bitte zuerst die E-Mail eingeben.';return;} try{await sendPasswordResetEmail(auth,e); $('#authMsg').textContent='Link zum Zurücksetzen wurde gesendet.';}catch(err){$('#authMsg').textContent=authErr(err);}};
 $('#authForm').onsubmit=async ev=>{ev.preventDefault(); const e=$('#authEmail').value.trim(), p=$('#authPass').value; $('#authMsg').textContent=''; $('#authBtn').disabled=true;
-  try{ if(regMode) await createUserWithEmailAndPassword(auth,e,p); else await signInWithEmailAndPassword(auth,e,p);}catch(err){$('#authMsg').textContent=authErr(err);} $('#authBtn').disabled=false;};
+  try{ if(regMode){ const cred=await createUserWithEmailAndPassword(auth,e,p); if(needsVerify(cred.user)) await sendEmailVerification(cred.user).catch(console.error); } else await signInWithEmailAndPassword(auth,e,p);}catch(err){$('#authMsg').textContent=authErr(err);} $('#authBtn').disabled=false;};
 function authErr(e){const c=e.code||''; return ({'auth/invalid-credential':'E-Mail oder Passwort ist falsch.','auth/wrong-password':'E-Mail oder Passwort ist falsch.','auth/user-not-found':'Kein Konto mit dieser E-Mail.','auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte anmelden.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.','auth/invalid-email':'Die E-Mail-Adresse ist ungültig.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut versuchen.','auth/operation-not-allowed':'E-Mail/Passwort-Anmeldung ist in Firebase nicht aktiviert.','auth/unauthorized-domain':'Diese Domain ist in Firebase nicht autorisiert.'})[c]||e.message;}
 
-onAuthStateChanged(auth, async u=>{
+async function handleUser(u){
   unsub.forEach(f=>f()); unsub=[]; user=u;
+  show('#verify',false);
   if(!u){ show('#app',false); show('#pending',false); show('#auth'); return; }
-  const email=(u.email||'').toLowerCase(); const adminMail=ADMIN_EMAILS.includes(email);
+  if(needsVerify(u)){ show('#auth',false); show('#app',false); show('#pending',false); $('#verifyMail').textContent=u.email; show('#verify'); return; }
+  const email=(u.email||'').toLowerCase(); const adminMail=isAdminMailUser(u);
   const ref=doc(db,'users',u.uid);
   try{
     let snap=await getDoc(ref);
@@ -498,12 +562,13 @@ onAuthStateChanged(auth, async u=>{
   unsub.push(onSnapshot(ref,s=>{
     profile=s.data()||{}; isAdmin=adminMail||(profile.approved&&profile.role==='admin');
     if(adminMail||profile.approved){ if($('#app').classList.contains('hidden')) startApp(); else render(); }
-    else { show('#auth',false); show('#app',false); $('#pendingMail').textContent=u.email; show('#pending'); }
+    else { show('#auth',false); show('#app',false); show('#verify',false); $('#pendingMail').textContent=u.email; show('#pending'); }
   }));
-});
+}
+onAuthStateChanged(auth, handleUser);
 
 function startApp(){
-  show('#auth',false); show('#pending',false); show('#app'); $('#whoMail').textContent=user.email;
+  show('#auth',false); show('#pending',false); show('#verify',false); show('#app'); $('#whoMail').textContent=user.email;
   unsub.push(onSnapshot(doc(db,'settings','main'),s=>{
     const data=s.data()||{}; S={...DEFAULT_SETTINGS,...data}; if(!Array.isArray(S.katalog)||!S.katalog.length)S.katalog=DEFAULT_KATALOG;
     if(!s.exists()&&isAdmin) setDoc(doc(db,'settings','main'),DEFAULT_SETTINGS).catch(console.error);
@@ -790,6 +855,10 @@ document.addEventListener('click',async e=>{
   try{
     switch(a){
       case 'logout': await signOut(auth); break;
+      case 'verifyResend': await sendEmailVerification(auth.currentUser); $('#verifyMsg').textContent='Link wurde erneut gesendet. Auch im Spam-Ordner nachsehen.'; break;
+      case 'verifyCheck': { const u=auth.currentUser; await u.reload(); if(!u.emailVerified){ $('#verifyMsg').textContent='Noch nicht bestätigt. Bitte zuerst den Link in der E-Mail öffnen.'; break; }
+        await u.getIdToken(true); $('#verifyMsg').textContent=''; show('#verify',false);
+        await handleUser(u); toast('E-Mail bestätigt. Admin-Rechte sind aktiv.'); break; }
       case 'new': openEditor(blankInvoice()); break;
       case 'import': $('#pdfInput').click(); break;
       case 'closeImport': closeImport(); break;
