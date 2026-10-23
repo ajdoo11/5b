@@ -51,13 +51,13 @@ label > input,label > textarea,label > select{margin-top:.2rem;font-size:15px;co
 /* App */
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--panel);border-bottom:1px solid var(--line)}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--panel)}
-.top-inner{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.7rem 1.2rem}
+.top-inner{max-width:1840px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.7rem clamp(1rem,2.5vw,2.5rem)}
 .top-inner .logo{height:34px;background:#fff;border-radius:3px;padding:2px 4px}
-.search{flex:1;max-width:460px;position:relative}
+.search{flex:1;max-width:640px;position:relative}
 .search input{padding-left:2.1rem}
 .search svg{position:absolute;left:.65rem;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
 .who{margin-left:auto;display:flex;align-items:center;gap:.6rem;font-size:13px;color:var(--muted)}
-main{max-width:1240px;margin:0 auto;padding:1.2rem}
+main{max-width:1840px;margin:0 auto;padding:1.2rem clamp(1rem,2.5vw,2.5rem)}
 
 /* Ablauf-Leiste: Neu > Gesendet > Archiv */
 .flow{display:flex;gap:0;margin-bottom:1rem;overflow-x:auto}
@@ -91,6 +91,7 @@ td .sub{font-size:13px;color:var(--muted)}
 td.acts{white-space:nowrap;text-align:right}
 td.acts .btn{margin-left:.3rem}
 .nr{font-weight:600;font-variant-numeric:tabular-nums}
+.mlabel{display:none;color:var(--muted);font-size:13px}
 .badge{display:inline-block;font-size:12px;font-weight:600;padding:.05rem .45rem;border-radius:4px;border:1px solid currentColor}
 .badge.neu{color:var(--orange)} .badge.gesendet{color:var(--petrol)} .badge.bezahlt{color:var(--green)} .badge.late{color:var(--red)} .badge.miss{color:var(--red)}
 .empty{padding:3rem 1rem;text-align:center;color:var(--muted)}
@@ -98,14 +99,17 @@ td.acts .btn{margin-left:.3rem}
 
 /* Overlay (Editor, Import) */
 .overlay{position:fixed;inset:0;z-index:50;background:rgba(10,25,36,.45);display:flex;justify-content:flex-end}
-.sheet.wide{width:min(1280px,100%)}
-.sheet{background:var(--gips);width:min(980px,100%);height:100%;overflow:auto;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.sheet.wide{width:min(1600px,100%)}
+.sheet{background:var(--gips);width:min(1440px,100%);height:100%;overflow:auto;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
 .sheet-head{position:sticky;top:0;z-index:2;background:var(--panel);border-bottom:1px solid var(--line);padding:.8rem 1.2rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 .sheet-head h2{font-size:24px;margin-right:auto}
 .sheet-body{padding:1.2rem;display:grid;gap:1rem}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.1rem}
+.ed-grid{display:grid;gap:1rem;align-items:start}
+@media (min-width:1100px){.ed-grid{grid-template-columns:minmax(0,2fr) minmax(0,3fr);grid-template-areas:"auftrag pos" "rech pos"}
+  .c-auftrag{grid-area:auftrag}.c-pos{grid-area:pos;position:sticky;top:72px}.c-rech{grid-area:rech}}
 .card h3{font-size:19px;margin-bottom:.7rem;color:var(--petrol)}
-.grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}
 .grid .wide{grid-column:1/-1}
 .warnline{color:var(--red);font-size:13px;font-weight:600;margin-top:.25rem}
 .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
@@ -131,7 +135,7 @@ table.imp .memo{font-size:12.5px;color:var(--muted);max-width:260px}
 table.imp .sug{font-size:12.5px;color:var(--petrol);font-weight:600}
 
 /* Einstellungen */
-.settings-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.settings-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr))}
 .settings-grid .full{grid-column:1/-1}
 table.cat{width:100%;border-collapse:collapse}
 table.cat td,table.cat th{padding:.3rem;text-align:left;font-size:14px}
@@ -148,12 +152,53 @@ table.cat th{font-size:12.5px;color:var(--muted);font-weight:600}
 .setup{max-width:720px;margin:3rem auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.6rem}
 .setup code{background:var(--petrol-soft);padding:.1rem .3rem;border-radius:3px}
 
-@media (max-width:720px){
-  .top-inner{flex-wrap:wrap;gap:.6rem}
+@media (max-width:760px){
+  input,select,textarea{font-size:16px!important}
+  .top-inner{flex-wrap:wrap;gap:.6rem;padding:.6rem .8rem}
+  .top-inner .logo{height:28px}
   .search{order:3;flex-basis:100%;max-width:none}
   .who span{display:none}
-  .flow button{min-width:120px;padding:.6rem 1.2rem .6rem 1.6rem}
+  main{padding:.8rem}
+  /* Status als 2er-Raster statt Pfeilen */
+  .flow{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;overflow:visible}
+  .flow button,.flow button:first-child{clip-path:none;margin:0;min-width:0;padding:.6rem .75rem;border:1px solid var(--line);border-radius:8px}
+  .flow button.settings{grid-column:1/-1;margin:0;text-align:center}
   .flow .n{font-size:24px}
+  .flow .s{font-size:11.5px}
+  .toolbar .hint{flex-basis:100%;font-size:13.5px}
+  .toolbar .btn{flex:1}
+  .toolbar .btn.primary{flex-basis:100%;order:-1;padding:.7rem}
+  /* Rechnungsliste als Karten */
+  .tablewrap{overflow:visible;background:transparent;border:0;box-shadow:none}
+  table.list{min-width:0}
+  table.list thead{display:none}
+  table.list,table.list tbody{display:block}
+  table.list tr.row{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nr amt" "kunde kunde" "date auf" "acts acts";gap:.25rem .8rem;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.75rem .85rem;margin-bottom:.6rem}
+  table.list td{padding:0;border:0}
+  table.list tr.row:hover td{background:none}
+  .c-nr{grid-area:nr}.c-amt{grid-area:amt}.c-kunde{grid-area:kunde}.c-date{grid-area:date}.c-auf{grid-area:auf;text-align:right}
+  .c-acts{grid-area:acts;display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.45rem;white-space:normal}
+  td.acts .btn{margin:0;flex:1;padding:.5rem .4rem}
+  .mlabel{display:inline}
+  .c-amt strong{font-size:17px}
+  .empty{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  /* Fenster (Rechnung, Import) */
+  .sheet-head{padding:.6rem .8rem;gap:.4rem}
+  .sheet-head h2{flex-basis:100%;font-size:21px}
+  .sheet-head .btn{flex:1;padding:.55rem .4rem;font-size:14px}
+  .sheet-body{padding:.8rem}
+  .card{padding:.85rem}
+  .chip{font-size:13px;padding:.4rem .7rem}
+  table.imp{min-width:0}
+  table.imp thead{display:none}
+  table.imp,table.imp tbody{display:block}
+  table.imp tr{display:grid;grid-template-columns:auto 1fr;gap:.35rem .6rem;padding:.7rem;border-bottom:1px solid var(--line)}
+  table.imp td{padding:0;border:0}
+  table.imp td:nth-child(n+3){grid-column:1/-1}
+  table.imp input[data-if="auftragsnr"]{width:100%!important}
+  table.imp .memo{max-width:none}
+  .userrow .btn{flex:1}
   table.pos thead{display:none}
   table.pos tr{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:.3rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
   table.pos td:first-child{grid-column:1/-1}
@@ -631,12 +676,12 @@ function renderList(){
       if(late) acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small primary" data-act="remind" data-id="${i.id}">Erinnerung senden</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
       acts+=`<button class="btn small warn" data-act="delRow" data-id="${i.id}" aria-label="Löschen">Löschen</button>`;
       return `<tr class="row" data-open="${i.id}">
-        <td><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${viewOf(i)==='mahnung'?'late':i.status}">${lbl[viewOf(i)]}</span></div>`:''}</td>
-        <td>${esc(isoToCh(i.datum))}<div class="sub">KW ${esc(kw2(i.kw))}${i.sentDate?` · gesendet ${esc(isoToCh(i.sentDate))}`:''}</div></td>
-        <td><strong>${esc(i.kunde||'—')}</strong><div class="sub">${esc(i.objekt||'')}</div></td>
-        <td>${i.auftragsnr?esc(i.auftragsnr):'<span class="badge miss">fehlt</span>'}</td>
-        <td class="num"><strong>${fmt(totalOf(i))}</strong>${late?`<div><span class="badge late">${daysOpen(i)} Tage offen</span></div>`:''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
-        <td class="acts">${acts}</td></tr>`;}).join('')}</tbody></table>`;
+        <td class="c-nr"><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${viewOf(i)==='mahnung'?'late':i.status}">${lbl[viewOf(i)]}</span></div>`:''}</td>
+        <td class="c-date">${esc(isoToCh(i.datum))}<div class="sub">KW ${esc(kw2(i.kw))}${i.sentDate?` · gesendet ${esc(isoToCh(i.sentDate))}`:''}</div></td>
+        <td class="c-kunde"><strong>${esc(i.kunde||'—')}</strong><div class="sub">${esc(i.objekt||'')}</div></td>
+        <td class="c-auf"><span class="mlabel">Auftrag </span>${i.auftragsnr?esc(i.auftragsnr):'<span class="badge miss">fehlt</span>'}</td>
+        <td class="num c-amt"><strong>${fmt(totalOf(i))}</strong>${late?`<div><span class="badge late">${daysOpen(i)} Tage offen</span></div>`:''}${i.erinnerung?`<div class="sub">Erinnerung ${esc(isoToCh(i.erinnerung))}</div>`:''}</td>
+        <td class="acts c-acts">${acts}</td></tr>`;}).join('')}</tbody></table>`;
 }
 
 /* ---------- Rechnungsnummer YYYY.MM.DD.NN ---------- */
@@ -682,7 +727,7 @@ function renderEditor(){
   $('#overlay').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Rechnung bearbeiten">
     <div class="sheet-head"><h2>${d.id?`Rechnung ${esc(d.nr)}`:'Neue Rechnung'}</h2>${btns}</div>
     <div class="sheet-body">
-      <div class="card"><h3>Auftrag</h3><div class="grid">
+      <div class="ed-grid"><div class="card c-auftrag"><h3>Auftrag</h3><div class="grid">
         ${F('kunde','Kunde')}
         <label>Auftrags-Nr.<input data-f="auftragsnr" value="${esc(d.auftragsnr)}" inputmode="numeric">${d.auftragsnr?'':'<div class="warnline">Auftrags-Nr. fehlt</div>'}</label>
         <label class="wide">Objekt / Adresse der Baustelle<input data-f="objekt" value="${esc(d.objekt)}"></label>
@@ -690,20 +735,20 @@ function renderEditor(){
         ${F('bemerkung','Zusatz auf Rechnung (z. B. Haus 6a, Monteur)')}
         ${d.memo?`<label class="wide">Memo aus Import (nur intern)<textarea data-f="memo" rows="2">${esc(d.memo)}</textarea></label>`:''}
       </div></div>
-      <div class="card"><h3>Positionen</h3>
+      <div class="card c-pos"><h3>Positionen</h3>
         <div class="chips">${S.katalog.map(k=>`<button class="chip" data-act="addCat" data-key="${esc(k.key)}">+ ${esc(k.bez)}</button>`).join('')}<button class="chip" data-act="addFree">+ Freie Position</button></div>
         <table class="pos"><thead><tr><th>Bezeichnung</th><th style="width:110px">Menge</th><th style="width:90px">Einheit</th><th style="width:120px">Preis CHF</th><th style="width:120px;text-align:right">Total CHF</th><th style="width:36px"></th></tr></thead>
         <tbody id="posBody"></tbody></table>
         <div class="totals" id="totals"></div>
       </div>
-      <div class="card"><h3>Rechnung</h3><div class="grid">
+      <div class="card c-rech"><h3>Rechnung</h3><div class="grid">
         ${F('nr','Rechnungs-Nr.','text',d.id?'':'placeholder="wird automatisch vergeben"')}
         ${F('datum','Rechnungsdatum','date')}
         ${F('kw','KW','number','min="1" max="53"')}
         ${F('mwstSatz','MwSt %','number','step="0.1"')}
         ${F('erinnerung','Erinnerung (Datum, optional)','date')}
         <label class="wide">Empfänger<textarea data-f="empfaenger" rows="3">${esc(d.empfaenger)}</textarea></label>
-      </div></div>
+      </div></div></div>
     </div></div>`;
   show('#overlay'); renderPositions();
 }
@@ -760,11 +805,11 @@ function renderImport(){
       <div class="tablewrap"><table class="imp"><thead><tr><th></th><th>Datum</th><th>Kunde</th><th>Auftrags-Nr.</th><th>Objekt / Adresse</th><th>Memo und Vorschlag</th></tr></thead><tbody>
       ${importRows.map((r,i)=>`<tr class="${r.dup?'dup':''}">
         <td><input type="checkbox" data-ii="${i}" data-if="sel" ${r.sel?'checked':''} aria-label="Übernehmen"></td>
-        <td style="white-space:nowrap">${esc(r.datum)}${r.dup?'<div><span class="badge late">schon vorhanden</span></div>':''}</td>
+        <td class="i-date" style="white-space:nowrap">${esc(r.datum)}${r.dup?'<div><span class="badge late">schon vorhanden</span></div>':''}</td>
         <td><input data-ii="${i}" data-if="kunde" value="${esc(r.kunde)}"></td>
         <td><input data-ii="${i}" data-if="auftragsnr" value="${esc(r.auftragsnr)}" style="width:120px">${r.auftragsnr?'':'<div class="warnline">fehlt</div>'}</td>
         <td><input data-ii="${i}" data-if="adresse" value="${esc(r.adresse)}"></td>
-        <td><div class="memo">${esc(r.memo)}</div><div class="sug">${r.sug.map(s=>`${esc((catItem(s.key)||{}).bez||s.key)}${s.menge?` ${fmtQty(s.menge)} ${esc((catItem(s.key)||{}).einheit||'')}`:''}`).join(' · ')||'–'}</div></td>
+        <td class="i-memo"><div class="memo">${esc(r.memo)}</div><div class="sug">${r.sug.map(s=>`${esc((catItem(s.key)||{}).bez||s.key)}${s.menge?` ${fmtQty(s.menge)} ${esc((catItem(s.key)||{}).einheit||'')}`:''}`).join(' · ')||'–'}</div></td>
       </tr>`).join('')}</tbody></table></div>
     </div></div>`;
   show('#overlay');
@@ -820,6 +865,12 @@ function renderSettings(){
         ${s.katalog.map((k,i)=>`<tr><td><input data-ci="${i}" data-cf="bez" value="${esc(k.bez)}" ${dis}></td><td><input data-ci="${i}" data-cf="einheit" value="${esc(k.einheit)}" list="units" ${dis}></td><td><input data-ci="${i}" data-cf="preis" type="number" step="0.05" value="${esc(k.preis)}" ${dis}></td><td>${isAdmin?`<button class="btn small warn" data-act="delCat" data-i="${i}" aria-label="Entfernen">×</button>`:''}</td></tr>`).join('')}
         </tbody></table>
         ${isAdmin?'<button class="btn small" data-act="addCatItem" style="margin-top:.6rem">Position hinzufügen</button>':''}
+      </div>
+      <div class="card full"><h3>Konten (nur zur Info)</h3>
+        <div class="grid">
+          <div><div style="font-size:13px;color:var(--muted)">Firebase-Konto</div><div style="font-weight:600;word-break:break-all">Madech.ch@gmail.com</div></div>
+          <div><div style="font-size:13px;color:var(--muted)">GitHub-Konto</div><div style="font-weight:600;word-break:break-all">Ajdo.slipac@gmail.com</div></div>
+        </div>
       </div>
       ${isAdmin?`<div class="card full"><h3>Benutzer${pend.length?` · ${pend.length} warten auf Freigabe`:''}</h3>
         ${users.length?users.sort((a,b)=>(a.approved-b.approved)||String(a.email).localeCompare(b.email)).map(u=>{
