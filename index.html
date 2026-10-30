@@ -138,7 +138,8 @@ table.pos .x{border:0;background:none;color:var(--red);font-size:20px;line-heigh
 table.imp{width:100%;border-collapse:collapse;min-width:900px}
 table.imp th{font-size:12.5px;color:var(--muted);text-align:left;padding:.4rem;border-bottom:1px solid var(--line)}
 table.imp td{padding:.35rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
-table.imp tr.dup td{opacity:.55}
+table.imp tr.dup td{background:#fff7ec}
+table.imp input.cnt{width:64px}
 table.imp input[type=checkbox]{width:18px;height:18px}
 table.imp .memo{font-size:12.5px;color:var(--muted);max-width:260px}
 table.imp .sug{font-size:12.5px;color:var(--petrol);font-weight:600}
@@ -686,6 +687,7 @@ function renderList(){
       if(i.status==='gesendet') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="remind" data-id="${i.id}">Erinnerung</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
       if(i.status==='bezahlt') acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small" data-act="unpaid" data-id="${i.id}">Zurück zu Gesendet</button>`;
       if(late) acts=`<button class="btn small" data-act="pdf" data-id="${i.id}">PDF</button><button class="btn small primary" data-act="remind" data-id="${i.id}">Erinnerung senden</button><button class="btn small ok" data-act="paid" data-id="${i.id}">Bezahlt</button>`;
+      acts+=`<button class="btn small" data-act="dupRow" data-id="${i.id}" title="Weitere Rechnung für dieses Objekt">+ Rechnung</button>`;
       acts+=`<button class="btn small warn" data-act="delRow" data-id="${i.id}" aria-label="Löschen">Löschen</button>`;
       return `<tr class="row" data-open="${i.id}">
         <td class="c-nr"><span class="nr">${esc(i.nr||'—')}</span>${search?`<div><span class="badge ${viewOf(i)==='mahnung'?'late':i.status}">${lbl[viewOf(i)]}</span></div>`:''}</td>
@@ -719,6 +721,11 @@ function catItem(key){return S.katalog.find(k=>k.key===key);}
 function posFromCat(key,menge=0){const c=catItem(key)||{bez:key,einheit:'',preis:0}; return {key, bez:c.bez, einheit:c.einheit, menge, preis:+c.preis||0};}
 function blankInvoice(){return {status:'neu',nr:'',datum:todayIso(),kw:isoWeek(todayIso()),auftragsDatum:'',kunde:'',auftragsnr:'',objekt:'',bemerkung:'',memo:'',empfaenger:S.empfaenger,erinnerung:'',mwstSatz:S.mwstSatz,positionen:[]};}
 function plain(o){return JSON.parse(JSON.stringify(o));}
+/* Neue Rechnung mit gleichem Kunden, Objekt und Auftrags-Nr. (Positionen ohne Mengen) */
+function sameObject(src){
+  return {...blankInvoice(),kunde:src.kunde||'',auftragsnr:src.auftragsnr||'',objekt:src.objekt||'',auftragsDatum:src.auftragsDatum||'',kw:src.kw||isoWeek(todayIso()),
+    memo:src.memo||'',empfaenger:src.empfaenger||S.empfaenger,positionen:(src.positionen||[]).map(p=>({...p,menge:0}))};
+}
 
 async function saveInvoice(inv){
   const data=plain(inv); const id=data.id; delete data.id;
@@ -747,14 +754,14 @@ function renderEditor(){
   if(st==='neu') btns+=`<button class="btn primary" data-act="edPdf">PDF exportieren</button>`;
   if(st==='gesendet') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn ok" data-act="edPaid">Bezahlt</button>`;
   if(st==='bezahlt') btns+=`<button class="btn" data-act="edPdf">PDF</button><button class="btn" data-act="edUnpaid">Zurück zu Gesendet</button>`;
-  if(d.id) btns+=`<button class="btn warn" data-act="delete">Löschen</button>`;
+  if(d.id) btns+=`<button class="btn" data-act="edDup">+ Weitere Rechnung</button><button class="btn warn" data-act="delete">Löschen</button>`;
   const F=(f,l,type='text',extra='')=>`<label>${l}<input type="${type}" data-f="${f}" value="${esc(d[f]??'')}" ${extra}></label>`;
   $('#overlay').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Rechnung bearbeiten">
     <div class="sheet-head"><h2>${d.id?`Rechnung ${esc(d.nr)}`:'Neue Rechnung'}</h2>${btns}</div>
     <div class="sheet-body">
       <div class="ed-grid"><div class="card c-auftrag"><h3>Auftrag</h3><div class="grid">
         ${F('kunde','Kunde')}
-        <label>Auftrags-Nr.<input data-f="auftragsnr" value="${esc(d.auftragsnr)}" inputmode="numeric">${d.auftragsnr?'':'<div class="warnline">Auftrags-Nr. fehlt</div>'}</label>
+        <label>Auftrags-Nr.<input data-f="auftragsnr" value="${esc(d.auftragsnr)}" inputmode="numeric" list="aufList" autocomplete="off">${d.auftragsnr?'':'<div class="warnline">Auftrags-Nr. fehlt</div>'}</label>
         <label class="wide">Objekt / Adresse der Baustelle<input data-f="objekt" value="${esc(d.objekt)}"></label>
         ${F('auftragsDatum','Montagedatum','date')}
         ${F('bemerkung','Zusatz auf Rechnung (z. B. Haus 6a, Monteur)')}
@@ -776,6 +783,10 @@ function renderEditor(){
       </div></div></div>
     </div></div>`;
   show('#overlay'); renderPositions();
+  // Vorschläge: bekannte Auftrags-Nr. mit Kunde und Objekt
+  let dl=$('#aufList'); if(!dl){dl=document.createElement('datalist');dl.id='aufList';document.body.appendChild(dl);}
+  const seen=new Map(); invoices.forEach(i=>{ if(i.auftragsnr&&!seen.has(i.auftragsnr)) seen.set(i.auftragsnr,i); });
+  dl.innerHTML=[...seen.values()].map(i=>`<option value="${esc(i.auftragsnr)}">${esc(i.kunde||'')} · ${esc(i.objekt||'')}</option>`).join('');
 }
 
 function renderPositions(){
@@ -801,9 +812,11 @@ $('#overlay').addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.f&&draft){ let v=t.value; if(t.type==='number')v=v===''?'':+v; draft[t.dataset.f]=v; dirty=true;
     if(t.dataset.f==='auftragsDatum'&&t.value){draft.kw=isoWeek(t.value); const k=$('[data-f="kw"]'); if(k)k.value=draft.kw;}
-    if(t.dataset.f==='mwstSatz')renderTotals(); }
+    if(t.dataset.f==='mwstSatz')renderTotals();
+    if(t.dataset.f==='auftragsnr'){ const m=invoices.find(i=>i.auftragsnr&&i.auftragsnr===t.value.trim()&&i.id!==draft.id);
+      if(m){ ['kunde','objekt','auftragsDatum'].forEach(f=>{ if(!draft[f]&&m[f]){ draft[f]=m[f]; const el=$(`[data-f="${f}"]`); if(el)el.value=m[f]; } }); if(!draft.kw&&m.kw)draft.kw=m.kw; } } }
   if(t.dataset.pi!=null&&draft){ const p=draft.positionen[+t.dataset.pi]; let v=t.value; if(t.type==='number')v=v===''?0:+v; p[t.dataset.pf]=v; dirty=true; renderTotals(); }
-  if(t.dataset.ii!=null){ importRows[+t.dataset.ii][t.dataset.if]=t.type==='checkbox'?t.checked:t.value; if(t.type==='checkbox')updImportBtn(); }
+  if(t.dataset.ii!=null){ importRows[+t.dataset.ii][t.dataset.if]=t.type==='checkbox'?t.checked:t.value; if(t.type==='checkbox'||t.dataset.if==='anzahl')updImportBtn(); }
 });
 $('#overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') (draft?closeEditor():closeImport()); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('#overlay').classList.contains('hidden')) (draft?closeEditor():closeImport()); });
@@ -817,12 +830,12 @@ $('#pdfInput').addEventListener('change',async e=>{
     const rows=await parseListPdf(pdf); pdf.destroy();
     if(!rows.length){toast('In dieser PDF wurden keine Aufträge gefunden.');return;}
     const existing=new Set(invoices.map(i=>i.importKey).filter(Boolean));
-    importRows=rows.map(r=>{const key=`${r.auftragsnr}|${r.datum}|${r.kunde}`.toUpperCase(); const dup=existing.has(key); return {...r,importKey:key,dup,sel:!dup,sug:suggestPositions(r.memo)};});
+    importRows=rows.map(r=>{const key=`${r.auftragsnr}|${r.datum}|${r.kunde}`.toUpperCase(); const dup=existing.has(key); return {...r,importKey:key,dup,sel:true,anzahl:1,sug:suggestPositions(r.memo)};});
     renderImport();
   }catch(err){console.error(err); toast('PDF konnte nicht gelesen werden.');}
 });
 function renderImport(){
-  const n=importRows.filter(r=>r.sel).length;
+  const n=importRows.filter(r=>r.sel).reduce((a,r)=>a+Math.max(1,Math.min(20,parseInt(r.anzahl)||1)),0);
   $('#overlay').innerHTML=`<div class="sheet wide" role="dialog" aria-modal="true" aria-label="Import prüfen">
     <div class="sheet-head"><h2>Import prüfen</h2><button class="btn" data-act="closeImport">Abbrechen</button><button class="btn primary" data-act="doImport" id="impBtn">${n} Rechnungen anlegen</button></div>
     <div class="sheet-body">
@@ -830,7 +843,7 @@ function renderImport(){
       <div class="tablewrap"><table class="imp"><thead><tr><th></th><th>Datum</th><th>Kunde</th><th>Auftrags-Nr.</th><th>Objekt / Adresse</th><th>Memo und Vorschlag</th></tr></thead><tbody>
       ${importRows.map((r,i)=>`<tr class="${r.dup?'dup':''}">
         <td><input type="checkbox" data-ii="${i}" data-if="sel" ${r.sel?'checked':''} aria-label="Übernehmen"></td>
-        <td class="i-date" style="white-space:nowrap">${esc(r.datum)}${r.dup?'<div><span class="badge late">schon vorhanden</span></div>':''}</td>
+        <td class="i-date" style="white-space:nowrap">${esc(r.datum)}${r.dup?'<div><span class="badge neu">schon importiert</span></div>':''}<div style="margin-top:.35rem;font-size:12.5px;color:var(--muted)">Anzahl Rechnungen<input class="cnt" type="number" min="1" max="20" data-ii="${i}" data-if="anzahl" value="${r.anzahl}"></div></td>
         <td><input data-ii="${i}" data-if="kunde" value="${esc(r.kunde)}"></td>
         <td><input data-ii="${i}" data-if="auftragsnr" value="${esc(r.auftragsnr)}" style="width:120px">${r.auftragsnr?'':'<div class="warnline">fehlt</div>'}</td>
         <td><input data-ii="${i}" data-if="adresse" value="${esc(r.adresse)}"></td>
@@ -839,16 +852,19 @@ function renderImport(){
     </div></div>`;
   show('#overlay');
 }
-function updImportBtn(){const n=importRows.filter(r=>r.sel).length; const b=$('#impBtn'); if(b)b.textContent=`${n} Rechnungen anlegen`;}
+function updImportBtn(){const n=importRows.filter(r=>r.sel).reduce((a,r)=>a+Math.max(1,Math.min(20,parseInt(r.anzahl)||1)),0); const b=$('#impBtn'); if(b)b.textContent=`${n} Rechnungen anlegen`;}
 function closeImport(){importRows=[]; show('#overlay',false); $('#overlay').innerHTML='';}
 async function doImport(){
   const sel=importRows.filter(r=>r.sel); if(!sel.length)return;
   const b=$('#impBtn'); b.disabled=true; let k=0;
-  for(const r of sel){
-    const ad=chToIso(r.datum);
-    const inv={...blankInvoice(),kunde:r.kunde,auftragsnr:r.auftragsnr,objekt:r.adresse,memo:r.memo,auftragsDatum:ad,kw:isoWeek(ad||todayIso()),importKey:r.importKey,
-      positionen:r.sug.map(s=>posFromCat(s.key,s.menge))};
-    try{await saveInvoice(inv); k++; b.textContent=`${k} / ${sel.length} angelegt …`;}catch(e){console.error(e); toast('Fehler beim Anlegen: '+(e.code||e.message)); break;}
+  const total=sel.reduce((a,r)=>a+Math.max(1,Math.min(20,parseInt(r.anzahl)||1)),0);
+  outer: for(const r of sel){
+    const ad=chToIso(r.datum); const cnt=Math.max(1,Math.min(20,parseInt(r.anzahl)||1));
+    for(let c=0;c<cnt;c++){
+      const inv={...blankInvoice(),kunde:r.kunde,auftragsnr:r.auftragsnr,objekt:r.adresse,memo:r.memo,auftragsDatum:ad,kw:isoWeek(ad||todayIso()),importKey:r.importKey,
+        positionen:r.sug.map(s=>posFromCat(s.key,c===0?s.menge:0))};
+      try{await saveInvoice(inv); k++; b.textContent=`${k} / ${total} angelegt …`;}catch(e){console.error(e); toast('Fehler beim Anlegen: '+(e.code||e.message)); break outer;}
+    }
   }
   closeImport(); tab='neu'; search=''; $('#search').value=''; render(); toast(`${k} Rechnungen unter «Neu» angelegt`);
 }
@@ -954,6 +970,8 @@ document.addEventListener('click',async e=>{
         break; }
       case 'deleteShown': { const lbl={neu:'Neu',gesendet:'Gesendet',mahnung:'Achtung Mahnung',bezahlt:'Archiv'}; await deleteMany(shownList.slice(), search?`Suche «${search}»`:lbl[tab]); break; }
       case 'deleteAll': await deleteMany(invoices.slice(),'alle Bereiche'); break;
+      case 'dupRow': openEditor(sameObject(inv)); toast('Neue Rechnung für das gleiche Objekt. Mengen eintragen und speichern.'); break;
+      case 'edDup': { if(dirty&&!confirm('Ungespeicherte Änderungen verwerfen?'))break; const src=plain(draft); dirty=false; openEditor(sameObject(src)); toast('Neue Rechnung für das gleiche Objekt. Mengen eintragen und speichern.'); break; }
       case 'delRow': if(confirm(`Rechnung ${inv.nr} (${inv.kunde||''}) endgültig löschen?`)){ await deleteDoc(doc(db,'invoices',id)); toast(`${inv.nr} gelöscht`); } break;
       case 'pdf': { const c=plain(inv); c.id=inv.id; await exportPdf(c); break; }
       case 'remind': { const c=plain(inv); c.id=inv.id; c.erinnerung=todayIso(); await updateDoc(doc(db,'invoices',id),{erinnerung:c.erinnerung}); buildPdf(c,S,logoInfo).save(pdfFileName(c,S).replace('.pdf',' - Erinnerung.pdf')); toast('Erinnerung erstellt'); break; }
